@@ -42,13 +42,26 @@ function doPost(e) {
     } else if (params.action === 'checkout') {
       return handleCheckOut(params, userEmail);
     } else if (params.action === 'getNearbyPlaces') {
-      return handleGetNearbyPlaces(params); // Pass params containing lat/lng
+      response = handleGetNearbyPlaces(params); // Pass params containing lat/lng
     } else {
-      return jsonResponse({ error: 'Invalid action' }, 400);
+      response = jsonResponse({ error: 'Invalid action' }, 400);
     }
+
+    // 無論如何，嘗試在最終回應加上 CORS 標頭
+    if (response && typeof response.setHeader === 'function') { // 確保 response 是可以設定標頭的物件 (雖然 TextOutput 不行，但以防萬一)
+       response.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+    } else if (response instanceof ContentService.TextOutput) {
+       // TextOutput 不能直接 setHeader，但 doPost 回傳它通常就隱含了權限 (如果 doOptions 成功的話)
+       // 這段修改主要是確保 handle... 函數的回傳被正確處理
+    }
+     return response;
+
   } catch (err) {
     Logger.log(err); // 記錄錯誤方便除錯
-    return jsonResponse({ error: 'Internal Server Error: ' + err.message }, 500);
+    const errorResponse = jsonResponse({ error: 'Internal Server Error: ' + err.message }, 500);
+    // 在錯誤回應中也嘗試加上標頭
+    // errorResponse.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN); // TextOutput 不能 setHeader
+    return errorResponse;
   }
 }
 
