@@ -32,6 +32,25 @@ const SCOPES = [
 ];
 
 async function createGoogleAuthClient() {
+  // --- Debugging: Check if googleapis can be resolved ---
+  try {
+    const resolvedPath = await import.meta.resolve('googleapis');
+    console.log(`Resolved 'googleapis' path: ${resolvedPath}`);
+  } catch (resolveErr) {
+    console.error(`Could not resolve 'googleapis': ${resolveErr.message}`);
+    // Log node_modules content if possible (might not work depending on permissions/env)
+    try {
+        const fs = await import('fs/promises');
+        const files = await fs.readdir(path.join(__dirname, 'node_modules'));
+        console.log("node_modules contents (partial):", files.slice(0, 20)); // Log first 20 entries
+        const googleapisExists = await fs.stat(path.join(__dirname, 'node_modules', 'googleapis')).catch(() => null);
+        console.log(`'googleapis' directory exists in node_modules: ${!!googleapisExists}`);
+    } catch (fsErr) {
+        console.log("Could not list node_modules:", fsErr.message);
+    }
+    // --- End Debugging ---
+  }
+  // --- Original Auth Logic ---
   try {
     if (KEY_JSON_CONTENT) {
       console.log("Authenticating using GOOGLE_CREDENTIALS_JSON environment variable.");
