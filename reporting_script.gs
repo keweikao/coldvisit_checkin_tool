@@ -10,10 +10,14 @@ const EMAIL_COLUMN_INDEX = 1; // 業務 Email 在 SOURCE_SHEET_NAME 中的欄位
 const CHECKIN_TIME_COLUMN_INDEX = 5; // 進店時間 在 SOURCE_SHEET_NAME 中的欄位索引 (F欄 = 5)
 const REVISIT_COLUMN_INDEX = 10; // 是否安排再訪 在 SOURCE_SHEET_NAME 中的欄位索引 (K欄 = 10)
 
-// 指令碼屬性 (Script Properties) 的 Key 名稱，用於儲存 Webhook URL
-const SLACK_WEBHOOK_URL_PROPERTY_KEY = 'SLACK_WEBHOOK_URL';
+ // 指令碼屬性 (Script Properties) 的 Key 名稱，用於儲存 Webhook URL
+ // const SLACK_WEBHOOK_URL_PROPERTY_KEY = 'SLACK_WEBHOOK_URL'; // Now hardcoded
 
-/**
+ // !! 安全性警告：將 Webhook URL 直接寫入程式碼會使其暴露於任何能看到此程式碼的人 !!
+ // !! 建議改用 Script Properties 儲存 !!
+ const SLACK_WEBHOOK_URL = 'https://hooks.slack.com/services/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'; // User-provided Webhook URL
+
+ /**
  * 主要函數，執行報表產生邏輯並發送 Slack 通知
  */
 function generateMonthlyReportAndNotifySlack() {
@@ -132,14 +136,14 @@ function generateMonthlyReport() {
 
 /**
  * 發送訊息到 Slack Incoming Webhook
- * @param {string} message 要發送的訊息 (支援 Slack Markdown)
- */
-function sendToSlack(message) {
-  // 從指令碼屬性讀取 Webhook URL
-  const webhookUrl = PropertiesService.getScriptProperties().getProperty(SLACK_WEBHOOK_URL_PROPERTY_KEY);
+  * @param {string} message 要發送的訊息 (支援 Slack Markdown)
+  */
+ function sendToSlack(message) {
+   // 使用硬編碼的 Webhook URL
+   const webhookUrl = SLACK_WEBHOOK_URL;
 
-  if (!webhookUrl) {
-    Logger.log('錯誤：尚未在指令碼屬性中設定 SLACK_WEBHOOK_URL');
+   if (!webhookUrl || webhookUrl === 'YOUR_SLACK_WEBHOOK_URL_HERE') { // Added check for placeholder
+     Logger.log('錯誤：尚未設定有效的 SLACK_WEBHOOK_URL 常數');
     // 可選擇在此處拋出錯誤或僅記錄日誌
     // throw new Error('Slack Webhook URL not configured.');
     return; // Or simply don't send if URL is missing
