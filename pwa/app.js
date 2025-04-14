@@ -1,4 +1,4 @@
-ㄑ// --- 設定值 ---
+// --- 設定值 ---
 const CLIENT_ID = '916934078689-iiqq9op8ee3q810ut8cclhbdg470puf0.apps.googleusercontent.com';
 const API_BASE_URL = 'https://coldvisit-backend.zeabur.app'; // Node.js backend URL
 const GOOGLE_MAPS_API_KEY = 'AIzaSyCwkcLZVbWHD_qPTJC5NfVDiiNSfcCH784'; // Note: Still needed for frontend Maps JS SDK if used later
