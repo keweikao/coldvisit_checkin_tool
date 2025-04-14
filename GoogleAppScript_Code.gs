@@ -9,14 +9,13 @@ const ALLOWED_ORIGIN = 'https://coldvisit-checkin.zeabur.app'; // 允許的來�
 
 /**
  * 處理 OPTIONS 預檢請求 (CORS)
+ * App Script Web App 對 OPTIONS 的處理比較特殊，
+ * 通常只需回傳一個成功的空回應即可，瀏覽器會接著發送實際請求。
+ * 不需要也不能直接在 TextOutput 上設定 CORS 標頭。
  */
 function doOptions(e) {
-  const response = ContentService.createTextOutput();
-  response.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
-  response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS'); // 允許的方法
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization'); // 允許的標頭
-  response.setHeader('Access-Control-Max-Age', '86400'); // 快取預檢結果一天
-  return response;
+  // 只需回傳一個空的成功 TextOutput
+  return ContentService.createTextOutput();
 }
 
 /**
