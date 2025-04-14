@@ -179,13 +179,10 @@ function createMap(location) {
    }
  }
 
-function searchNearbyPlaces(location) {
+ function searchNearbyPlaces(location) {
   const request = {
     location: location,
-     radius: '1000', // Increased radius slightly
-     // type: 'food', // Remove type filter
-     keyword: '餐廳' // Use keyword search instead
-     // rankBy: google.maps.places.RankBy.DISTANCE // Alternative: rank by distance instead of radius, requires keyword or name, not type
+     radius: '50' // Reduce radius significantly, no type/keyword filter
    };
 
    console.log("Attempting nearbySearch with request:", request);
