@@ -30,10 +30,52 @@ const selectedPlaceDiv = document.getElementById('selected-place');
 const photoPreview = document.getElementById('photo-preview');
 const durationInfo = document.getElementById('duration-info');
 
-// --- Initialization ---
-// initMap is called by the Google Maps script callback, NOT window.onload anymore
+ // --- Initialization ---
+ window.onload = () => {
+   console.log("window.onload triggered"); // Debug Log
+   // Check for OAuth redirect hash
+   handleRedirectHash();
 
-// --- Event Listeners ---
+   accessToken = localStorage.getItem('access_token');
+   visitId = localStorage.getItem('visitId');
+   placeName = localStorage.getItem('placeName');
+   placeAddress = localStorage.getItem('placeAddress');
+   console.log("onload - accessToken:", accessToken ? 'Exists' : 'null'); // Debug Log
+   console.log("onload - visitId:", visitId); // Debug Log
+
+   if (accessToken) {
+     console.log("onload - Access token found, hiding login."); // Debug Log
+     // 已登入
+     loginSection.classList.add('hidden');
+     if (visitId && placeName) {
+       console.log("onload - Visit in progress, showing checkout."); // Debug Log
+       // 正在進行中的拜訪
+       showCheckoutSection();
+     } else {
+       console.log("onload - No visit in progress, showing checkin."); // Debug Log
+       // 顯示 Check-in 頁面
+       showCheckInSection();
+       // Trigger map load if needed (initMap should handle this via callback)
+       if (typeof google === 'object' && typeof google.maps === 'object') {
+            // If maps API already loaded (e.g., after redirect), ensure map loads
+            if (!map) { // Only if map hasn't been initialized by callback yet
+                 console.log("onload - Manually triggering map load sequence.");
+                 initMap(); // Call initMap directly if needed
+            }
+       } else {
+            console.log("onload - Google Maps API not ready yet.");
+       }
+     }
+   } else {
+     console.log("onload - No access token, showing login."); // Debug Log
+     // 顯示登入按鈕
+     showLoginSection();
+   }
+ };
+
+ // initMap is called by the Google Maps script callback
+
+ // --- Event Listeners ---
 document.getElementById('login-btn').onclick = handleLogin;
 // Removed locate-btn listener
 document.getElementById('photo-input').onchange = handlePhotoChange;
@@ -122,23 +164,41 @@ function createMap(location) {
           strokeWeight: 2,
           strokeColor: "#ffffff",
       }
-  });
+   });
 
-  infoWindow = new google.maps.InfoWindow();
-  placesService = new google.maps.places.PlacesService(map);
-}
+   infoWindow = new google.maps.InfoWindow();
+   // Ensure Places library is loaded before creating service
+   if (google.maps.places && google.maps.places.PlacesService) {
+       console.log("Places library loaded, creating PlacesService.");
+       placesService = new google.maps.places.PlacesService(map);
+   } else {
+       console.error("Places library not loaded when trying to create PlacesService!");
+       alert("地圖地點服務載入失敗，請重新整理頁面。");
+       loadingMapDiv.innerText = '地圖地點服務載入失敗。';
+       return; // Stop further execution if PlacesService is unavailable
+   }
+ }
 
 function searchNearbyPlaces(location) {
   const request = {
     location: location,
-    radius: '1000', // Increased radius slightly
-    // types: ['restaurant', 'cafe', 'food', 'meal_takeaway'] // Broader search
-    type: 'food' // Keep it simple for now
-  };
+     radius: '1000', // Increased radius slightly
+     // type: 'food', // Remove type filter
+     keyword: '餐廳' // Use keyword search instead
+     // rankBy: google.maps.places.RankBy.DISTANCE // Alternative: rank by distance instead of radius, requires keyword or name, not type
+   };
 
-  placesService.nearbySearch(request, (results, status) => {
-    loadingMapDiv.classList.add('hidden'); // Hide loading message
-    if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+   console.log("Attempting nearbySearch with request:", request);
+   if (!placesService) {
+       console.error("placesService is not initialized!");
+       alert("地點搜尋服務未就緒，請稍後再試。");
+       return;
+   }
+
+   placesService.nearbySearch(request, (results, status) => {
+     console.log("nearbySearch callback status:", status); // Log the status
+     loadingMapDiv.classList.add('hidden'); // Hide loading message
+     if (status === google.maps.places.PlacesServiceStatus.OK && results) {
       console.log(`Found ${results.length} places nearby.`);
       clearMarkers();
       for (let i = 0; i < results.length; i++) {
