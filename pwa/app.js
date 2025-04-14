@@ -1,6 +1,6 @@
-// --- 設定值 ---
+ㄑ// --- 設定值 ---
 const CLIENT_ID = '916934078689-iiqq9op8ee3q810ut8cclhbdg470puf0.apps.googleusercontent.com';
-const PROXY_API_URL = 'https://coldvisit-backend.zeabur.app/api/proxy'; // URL for the Node.js proxy backend endpoint
+const API_BASE_URL = 'https://coldvisit-backend.zeabur.app'; // Node.js backend URL
 const GOOGLE_MAPS_API_KEY = 'AIzaSyCwkcLZVbWHD_qPTJC5NfVDiiNSfcCH784'; // Note: Still needed for frontend Maps JS SDK if used later
 const COMPANY_DOMAIN = 'ichef.com.tw';
 
@@ -164,8 +164,8 @@ async function handleLocate() {
     loadingDiv.innerText = '取得附近餐廳...';
 
     try {
-      // 呼叫後端 Node.js Proxy API
-      const response = await fetch(PROXY_API_URL, {
+      // 呼叫後端 Node.js API
+      const response = await fetch(`${API_BASE_URL}/api/getNearbyPlaces`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -229,11 +229,11 @@ async function handleSelectPlace(placeData) {
   loadingDiv.classList.remove('hidden');
   loadingDiv.innerText = '記錄進店資訊...';
 
-  try {
-    // 呼叫後端 Node.js Proxy API
-    const response = await fetch(PROXY_API_URL, {
-      method: 'POST',
-      headers: {
+   try {
+     // 呼叫後端 Node.js API
+     const response = await fetch(`${API_BASE_URL}/api/checkin`, {
+       method: 'POST',
+       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + accessToken
       },
@@ -313,11 +313,11 @@ function handlePhotoChange(e) {
   loadingDiv.classList.remove('hidden');
   loadingDiv.innerText = '送出拜訪紀錄...';
 
-  try {
-     // 呼叫後端 Node.js Proxy API
-     const response = await fetch(PROXY_API_URL, {
-       method: 'POST',
-       headers: {
+   try {
+      // 呼叫後端 Node.js API
+      const response = await fetch(`${API_BASE_URL}/api/checkout`, {
+        method: 'POST',
+        headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + accessToken
       },
