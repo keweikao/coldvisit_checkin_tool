@@ -77,10 +77,10 @@ app.post('/api/getNearbyPlaces', async (req, res) => {
       return res.status(500).json({ error: 'Server configuration error: Maps API Key missing.' });
   }
 
-  const radius = 500;
-  const type = 'restaurant';
-  const language = 'zh-TW';
-  const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&language=${language}&key=${GOOGLE_MAPS_API_KEY}`;
+   const radius = 500;
+   const type = 'food'; // 改為 'food' 搜尋更廣泛的餐飲地點
+   const language = 'zh-TW';
+   const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&language=${language}&key=${GOOGLE_MAPS_API_KEY}`;
 
   try {
     console.log(`Fetching places for ${lat},${lng}`);
