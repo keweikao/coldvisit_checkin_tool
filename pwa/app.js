@@ -133,12 +133,13 @@ async function handleLocate() {
     try {
       // 改為呼叫後端 App Script API
       const response = await fetch(SCRIPT_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + accessToken // 傳遞 Token 供後端驗證 (雖然此 API 可能不需要)
-        },
-        mode: 'cors',
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json'
+           // 暫時移除 Authorization 標頭，測試是否為此引起 CORS 問題
+           // 'Authorization': 'Bearer ' + accessToken
+         },
+         mode: 'cors',
         body: JSON.stringify({
           action: 'getNearbyPlaces',
           lat: lat,
