@@ -64,46 +64,12 @@ const app = express();
 app.use(cors({ origin: FRONTEND_ORIGIN }));
 app.use(express.json({ limit: '10mb' })); // For Base64 photo data
 
-// --- API Endpoints ---
+ // --- API Endpoints ---
 
-// GET Nearby Places (using Node.js backend)
-app.post('/api/getNearbyPlaces', async (req, res) => {
-  const { lat, lng } = req.body;
-  if (!lat || !lng) {
-    return res.status(400).json({ error: 'Missing latitude or longitude' });
-  }
-  if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.includes('YOUR_')) {
-      console.error("Google Maps API Key is missing or placeholder.");
-      return res.status(500).json({ error: 'Server configuration error: Maps API Key missing.' });
-  }
+ // Removed /api/getNearbyPlaces as it's now handled by frontend Maps JS API
 
-   const radius = 500;
-   const type = 'food'; // 改為 'food' 搜尋更廣泛的餐飲地點
-   const language = 'zh-TW';
-   const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&language=${language}&key=${GOOGLE_MAPS_API_KEY}`;
-
-  try {
-    console.log(`Fetching places for ${lat},${lng}`);
-    const placesResponse = await fetch(url);
-    const placesData = await placesResponse.json(); // Always try to parse JSON
-
-    if (!placesResponse.ok) {
-      console.error(`Places API Error (${placesResponse.status}):`, placesData);
-      // Try to forward a meaningful error from Google
-      const errorMessage = placesData?.error_message || `Google Places API request failed with status ${placesResponse.status}`;
-      throw new Error(errorMessage);
-    }
-
-    console.log(`Found ${placesData.results?.length || 0} places`);
-    res.json(placesData); // Forward Google's response
-  } catch (error) {
-    console.error('Error fetching nearby places:', error);
-    res.status(500).json({ error: 'Failed to fetch nearby places', details: error.message });
-  }
-});
-
-// POST Check-in
-// TODO: Implement proper user authentication/identification middleware
+ // POST Check-in
+ // TODO: Implement proper user authentication/identification middleware
 //       For now, we'll extract email from the token if provided, otherwise use placeholder
 app.post('/api/checkin', async (req, res) => {
   const { placeName, placePhone, placeAddress, placeId } = req.body; // Added placeId
