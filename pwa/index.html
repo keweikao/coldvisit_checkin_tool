@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<title>陌生開發拜訪紀錄</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 1em; max-width: 600px; margin: auto; background-color: #f4f4f4; }
+h1, h2 { color: #333; }
+button { font-size: 1.1em; margin: 0.5em 0; padding: 0.8em 1.2em; cursor: pointer; border: none; border-radius: 5px; background-color: #007bff; color: white; }
+button:hover { background-color: #0056b3; }
+input, select, textarea { font-size: 1em; width: calc(100% - 1.2em); margin: 0.5em 0; padding: 0.6em; border: 1px solid #ccc; border-radius: 4px; }
+label { display: block; margin-top: 0.8em; font-weight: bold; color: #555; }
+#places { margin-top: 1em; max-height: 40vh; overflow-y: auto; border: 1px solid #eee; background-color: white; padding: 0.5em; }
+.place { border-bottom: 1px solid #eee; padding: 0.8em 0.5em; }
+.place:last-child { border-bottom: none; }
+.place strong { font-size: 1.1em; color: #333; }
+.place span { display: block; color: #666; font-size: 0.9em; margin-top: 0.2em; }
+.place button { float: right; font-size: 0.9em; padding: 0.4em 0.8em; margin-top: -0.5em; }
+.hidden { display: none; }
+#selected-place { background-color: #e9ecef; padding: 0.8em; border-radius: 5px; margin-bottom: 1em; }
+#photo-preview { max-width: 100%; margin-top: 0.5em; border-radius: 5px; border: 1px solid #ddd; }
+#loading { text-align: center; padding: 1em; font-style: italic; color: #777; }
+</style>
+</head>
+<body>
+
+<h1>陌生開發拜訪紀錄</h1>
+
+<div id="login-section">
+  <button id="login-btn">使用 @ichef.com.tw 登入</button>
+</div>
+
+<div id="checkin-section" class="hidden">
+  <h2>1. 選擇拜訪店家</h2>
+  <button id="locate-btn">取得附近餐廳</button>
+  <div id="loading" class="hidden">定位中，請稍候...</div>
+  <div id="places">請先點擊上方按鈕取得附近餐廳</div>
+</div>
+
+<div id="checkout-section" class="hidden">
+  <h2>2. 完成拜訪紀錄</h2>
+  <div id="selected-place">
+    <!-- 店家資訊會顯示在這裡 -->
+  </div>
+  <label for="photo-input">拍照：</label>
+  <input type="file" accept="image/*" capture="environment" id="photo-input" />
+  <img id="photo-preview" alt="照片預覽" style="display:none;" />
+
+  <label for="contact-person">接觸人姓名：</label>
+  <input id="contact-person" required />
+
+  <label for="contact-info">聯絡方式：</label>
+  <input id="contact-info" required />
+
+  <label for="revisit-needed">是否安排再訪：</label>
+  <select id="revisit-needed">
+    <option value="是">是</option>
+    <option value="否" selected>否</option>
+  </select>
+
+  <label for="notes">備註：</label>
+  <textarea id="notes" rows="3"></textarea>
+
+  <button id="submit-checkout">送出紀錄</button>
+</div>
+
+<div id="done-section" class="hidden">
+  <h2>拜訪完成！</h2>
+  <p id="duration-info"></p>
+  <button onclick="showCheckInSection()">記錄下一家</button>
+</div>
+
+<!-- 加入 Google Maps JavaScript API (僅用於 Places API，可考慮移除) -->
+<!-- <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places"></script> -->
+<script src="app.js"></script>
+</body>
+</html>
