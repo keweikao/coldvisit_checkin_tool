@@ -56,88 +56,50 @@ async function createGoogleAuthClient() {
 async function verifyGoogleOAuthToken(token) {
   if (!token) return null;
   try {
-    // Use Google's tokeninfo endpoint
     const response = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Token verification failed (${response.status}): ${errorText}`);
-      return null; // Token invalid or expired
+      return null;
     }
     const tokenInfo = await response.json();
-
-    // 1. Verify the audience (aud) claim matches your Client ID
     if (tokenInfo.aud !== EXPECTED_OAUTH_CLIENT_ID) {
       console.error(`Token verification failed: Invalid audience. Expected ${EXPECTED_OAUTH_CLIENT_ID}, got ${tokenInfo.aud}`);
        return null;
      }
-
-     // 2. Verify the issuer (iss) - Temporarily commented out for debugging
+     // Temporarily commented out issuer check
      // if (!tokenInfo.iss || !tokenInfo.iss.includes('accounts.google.com')) {
-     //   console.error('Token verification failed: Invalid issuer.');
-     //   return null;
+     //   console.error('Token verification failed: Invalid issuer.'); return null;
      // }
-
-     // 3. Verify expiry is implicitly handled by Google, but check presence
-    if (!tokenInfo.exp) {
-        console.error('Token verification failed: No expiration claim.');
-        return null;
-    }
-
-    // 4. Check if email is verified
+    if (!tokenInfo.exp) { console.error('Token verification failed: No expiration claim.'); return null; }
     if (tokenInfo.email && tokenInfo.email_verified === 'true') {
-        // 5. Optional: Verify domain (hd claim)
-        // if (tokenInfo.hd !== 'ichef.com.tw') {
-        //     console.error(`Token verification failed: Invalid domain ${tokenInfo.hd}`);
-        //     return null;
-        // }
         console.log(`Token verified for email: ${tokenInfo.email}`);
-        return tokenInfo.email; // Return verified email
-    } else {
-        console.error('Token verification failed: Email not verified or missing.');
-        return null;
-    }
-  } catch (error) {
-    console.error('Error verifying Google OAuth token:', error);
-    return null;
-  }
+        return tokenInfo.email;
+    } else { console.error('Token verification failed: Email not verified or missing.'); return null; }
+  } catch (error) { console.error('Error verifying Google OAuth token:', error); return null; }
 }
 
 // --- Authentication Middleware ---
 const authenticateUser = async (req, res, next) => {
     const authHeader = req.headers.authorization;
-    let userEmail = null;
-    let errorMsg = null;
-
+    let userEmail = null; let errorMsg = null;
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.split(' ')[1];
-        console.log("Attempting to verify token..."); // Log before verification
+        console.log("Attempting to verify token...");
         userEmail = await verifyGoogleOAuthToken(token);
-        if (!userEmail) {
-            errorMsg = 'Invalid or expired token.';
-        }
-        // Optional: Add domain check here if needed, based on verifyGoogleOAuthToken result
-        // else if (!userEmail.endsWith('@ichef.com.tw')) {
-        //     userEmail = null; // Invalidate if wrong domain
-        //     errorMsg = 'Unauthorized domain.';
-        // }
-    } else {
-        errorMsg = 'Authorization header missing or invalid.';
-    }
-
+        if (!userEmail) { errorMsg = 'Invalid or expired token.'; }
+    } else { errorMsg = 'Authorization header missing or invalid.'; }
     if (!userEmail) {
         console.warn(`Authentication failed: ${errorMsg || 'No valid token found.'}`);
         return res.status(401).json({ error: 'Unauthorized', details: errorMsg || 'Valid token required.' });
     }
-
-    req.userEmail = userEmail; // Attach verified email to request object
+    req.userEmail = userEmail;
     console.log(`Authentication successful for: ${req.userEmail}`);
-    next(); // Proceed to the next handler
+    next();
 };
-
 
 // --- Express App Setup ---
 const app = express();
-
 app.use(cors({ origin: FRONTEND_ORIGIN }));
 app.use(express.json({ limit: '10mb' }));
 
@@ -147,37 +109,39 @@ app.use(express.json({ limit: '10mb' }));
 app.post('/api/getNearbyPlaces', authenticateUser, async (req, res) => {
   const { lat, lng } = req.body;
   if (!lat || !lng) { return res.status(400).json({ error: 'Missing latitude or longitude' }); }
-  if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.includes('YOUR_')) {
-      console.error("Maps API Key missing."); return res.status(500).json({ error: 'Server config error' });
-  }
-
+  if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.includes('YOUR_')) { console.error("Maps API Key missing."); return res.status(500).json({ error: 'Server config error' }); }
   const radius = 500; const type = 'food'; const language = 'zh-TW';
   const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&language=${language}&key=${GOOGLE_MAPS_API_KEY}`;
-
   try {
     console.log(`Fetching places for ${lat},${lng} (User: ${req.userEmail})`);
     const placesResponse = await fetch(url);
     const placesData = await placesResponse.json();
-    if (!placesResponse.ok) {
-      console.error(`Places API Error (${placesResponse.status}):`, placesData);
-      throw new Error(placesData?.error_message || `Places API failed (${placesResponse.status})`);
-    }
+    if (!placesResponse.ok) { console.error(`Places API Error (${placesResponse.status}):`, placesData); throw new Error(placesData?.error_message || `Places API failed (${placesResponse.status})`); }
     console.log(`Found ${placesData.results?.length || 0} places`);
     res.json(placesData);
-  } catch (error) {
-    console.error('Error fetching nearby places:', error);
-    res.status(500).json({ error: 'Failed to fetch nearby places', details: error.message });
-  }
+  } catch (error) { console.error('Error fetching nearby places:', error); res.status(500).json({ error: 'Failed to fetch nearby places', details: error.message }); }
 });
 
 // POST Check-in (Uses authenticateUser middleware)
 app.post('/api/checkin', authenticateUser, async (req, res) => {
-  const { placeName, placePhone, placeAddress, placeId } = req.body;
-  const userEmail = req.userEmail; // Use verified email
+  const { placeName, placeAddress, placeId } = req.body; // Phone comes from Details API now
+  const userEmail = req.userEmail;
 
-  if (!placeName || !placeAddress || !placeId) {
-      return res.status(400).json({ error: 'Missing placeId, place name or address' });
-  }
+  if (!placeName || !placeAddress || !placeId) { return res.status(400).json({ error: 'Missing placeId, place name or address' }); }
+
+  let fetchedPlacePhone = '';
+  try {
+    // --- Fetch Place Details (Phone Number) ---
+    console.log(`Fetching details for Place ID: ${placeId}`);
+    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_phone_number&key=${GOOGLE_MAPS_API_KEY}&language=zh-TW`;
+    const detailsResponse = await fetch(detailsUrl);
+    const detailsData = await detailsResponse.json();
+    if (detailsResponse.ok && detailsData.result && detailsData.result.formatted_phone_number) {
+        fetchedPlacePhone = detailsData.result.formatted_phone_number;
+        console.log(`Found phone number: ${fetchedPlacePhone}`);
+    } else { console.warn(`Could not fetch phone number for ${placeId}. Status: ${detailsData.status}`, detailsData.error_message || ''); }
+  } catch (detailsError) { console.error(`Error fetching place details for ${placeId}:`, detailsError); }
+  // --- End Fetch Place Details ---
 
   try {
     const auth = await createGoogleAuthClient();
@@ -185,13 +149,13 @@ app.post('/api/checkin', authenticateUser, async (req, res) => {
     const visitId = Utilities.getUuid();
     const now = new Date();
     const values = [[
-        visitId, userEmail, placeName, placePhone || '', placeAddress, now.toISOString(),
+        visitId, userEmail, placeName, fetchedPlacePhone, placeAddress, now.toISOString(),
         '', '', '', '', '', '', '', placeId
     ]];
 
     console.log(`Appending check-in for ${placeName} by ${userEmail}`);
     await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID, range: `${SHEET_NAME}!A:O`, // Updated range to include Place ID
+      spreadsheetId: SPREADSHEET_ID, range: `${SHEET_NAME}!A:O`,
       valueInputOption: 'USER_ENTERED', requestBody: { values: values },
     });
 
@@ -208,7 +172,7 @@ app.post('/api/checkout', authenticateUser, async (req, res) => {
   const { visitId, contactRole, revisitNeeded, notes, photoBase64, photoMimeType, photoFilename } = req.body;
   const contactPerson = revisitNeeded ? req.body.contactPerson : '';
   const contactInfo = revisitNeeded ? req.body.contactInfo : '';
-  const userEmail = req.userEmail; // Use verified email
+  const userEmail = req.userEmail;
 
   if (!visitId || !contactRole) { return res.status(400).json({ error: 'Missing visitId or contactRole' }); }
   if (revisitNeeded && (!contactPerson || !contactInfo)) { return res.status(400).json({ error: 'Missing contactPerson or contactInfo when revisit is needed' }); }
@@ -219,28 +183,22 @@ app.post('/api/checkout', authenticateUser, async (req, res) => {
     const drive = google.drive({ version: 'v3', auth });
     const now = new Date();
 
-    // 1. Find row (ensure range includes email column B)
+    // 1. Find row
     console.log(`Finding row for visitId: ${visitId}`);
     const rangeData = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${SHEET_NAME}!A:O` });
     let rowIndex = -1; let checkInTime = null; let rowOwnerEmail = null;
     if (rangeData.data.values) {
         for (let i = 1; i < rangeData.data.values.length; i++) {
             if (rangeData.data.values[i][0] === visitId) {
-                rowIndex = i + 1;
-                rowOwnerEmail = rangeData.data.values[i][1];
-                checkInTime = new Date(rangeData.data.values[i][5]);
-                break;
+                rowIndex = i + 1; rowOwnerEmail = rangeData.data.values[i][1]; checkInTime = new Date(rangeData.data.values[i][5]); break;
             }
         }
     }
     if (rowIndex === -1) { console.error(`Visit ID ${visitId} not found.`); return res.status(404).json({ error: 'Visit ID not found' }); }
     console.log(`Found visitId ${visitId} at row ${rowIndex} owned by ${rowOwnerEmail}`);
 
-    // Security Check: Ensure user checking out is the owner
-    if (userEmail !== rowOwnerEmail) {
-        console.warn(`User mismatch: ${userEmail} trying to check out visit owned by ${rowOwnerEmail}`);
-        return res.status(403).json({ error: 'Forbidden: Cannot check out another user\'s visit.' });
-    }
+    // Security Check
+    if (userEmail !== rowOwnerEmail) { console.warn(`User mismatch: ${userEmail} != ${rowOwnerEmail}`); return res.status(403).json({ error: 'Forbidden' }); }
 
     // 2. Upload Photo
     let photoUrl = '';
@@ -250,20 +208,16 @@ app.post('/api/checkout', authenticateUser, async (req, res) => {
         const base64Data = photoBase64.includes(',') ? photoBase64.split(',')[1] : photoBase64;
         const decodedBytes = Buffer.from(base64Data, 'base64');
         const bufferStream = new PassThrough(); bufferStream.end(decodedBytes);
-        const fileMetadata = { name: `${visitId}_${photoFilename}`, parents: [DRIVE_FOLDER_ID] }; // Use updated DRIVE_FOLDER_ID
+        const fileMetadata = { name: `${visitId}_${photoFilename}`, parents: [DRIVE_FOLDER_ID] };
         const media = { mimeType: photoMimeType, body: bufferStream };
         const file = await drive.files.create({ requestBody: fileMetadata, media: media, fields: 'id, webViewLink' });
         await drive.permissions.create({ fileId: file.data.id, requestBody: { role: 'reader', type: 'anyone' } });
         photoUrl = file.data.webViewLink || `https://drive.google.com/file/d/${file.data.id}/view`;
         console.log(`Photo uploaded: ${photoUrl}`);
       } catch (driveErr) {
-          console.error('Drive upload error:', driveErr.message); // Log specific error message
-          // Check for common permission/not found errors
-          if (driveErr.message.includes('File not found') || driveErr.message.includes('notFound')) {
-              console.error(`Potential issue: Drive Folder ID "${DRIVE_FOLDER_ID}" might be incorrect or service account lacks Editor permission.`);
-          } else if (driveErr.message.includes('permission')) {
-               console.error(`Potential issue: Service account might lack Editor permission on Drive Folder ID "${DRIVE_FOLDER_ID}".`);
-          }
+          console.error('Drive upload error:', driveErr.message);
+          if (driveErr.message.includes('File not found') || driveErr.message.includes('notFound')) { console.error(`Potential issue: Drive Folder ID "${DRIVE_FOLDER_ID}" might be incorrect or service account lacks Editor permission.`); }
+          else if (driveErr.message.includes('permission')) { console.error(`Potential issue: Service account might lack Editor permission on Drive Folder ID "${DRIVE_FOLDER_ID}".`); }
           photoUrl = 'Upload Error';
       }
     }
@@ -271,7 +225,7 @@ app.post('/api/checkout', authenticateUser, async (req, res) => {
     // 3. Calculate Duration
     const durationMin = checkInTime ? Math.round((now - checkInTime) / 60000) : 0;
 
-    // 4. Update Sheet (Ensure columns match your sheet: G=Out, H=Dur, I=Person, J=Info, K=Revisit, L=Role, M=Photo, N=Notes)
+    // 4. Update Sheet (Columns: G=Out, H=Dur, I=Person, J=Info, K=Revisit, L=Role, M=Photo, N=Notes)
     const valuesToUpdate = [
         { range: `${SHEET_NAME}!G${rowIndex}`, values: [[now.toISOString()]] }, { range: `${SHEET_NAME}!H${rowIndex}`, values: [[durationMin]] },
         { range: `${SHEET_NAME}!I${rowIndex}`, values: [[contactPerson]] }, { range: `${SHEET_NAME}!J${rowIndex}`, values: [[contactInfo]] },
