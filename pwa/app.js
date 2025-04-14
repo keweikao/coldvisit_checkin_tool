@@ -373,13 +373,13 @@ function handlePhotoChange(e) {
       const result = await response.json();
       checkoutSection.removeChild(controlsLoading);
 
-      if (response.ok && result.success) {
-        alert('紀錄已成功送出！'); // Give feedback before switching view
-        clearVisitData();
-        showCheckInSection(); // Go back to map view
-        getCurrentLocationAndLoadMap(); // Reload map for next checkin
-      } else { throw new Error(result.error || `Check-out API failed (${response.status})`); }
-  } catch (error) {
+       if (response.ok && result.success) {
+         alert('紀錄已成功送出！'); // Give feedback before switching view
+         clearVisitData();
+         showCheckInSection(); // Go back to map view
+         // getCurrentLocationAndLoadMap(); // Temporarily disable map reload on success
+       } else { throw new Error(result.error || `Check-out API failed (${response.status})`); }
+   } catch (error) {
     console.error('Check-out failed:', error);
     checkoutSection.removeChild(controlsLoading);
     alert('送出紀錄失敗: ' + error.message);
