@@ -14,8 +14,8 @@ const ALLOWED_ORIGIN = '*'; // 改為萬用字元測試
  * 不需要也不能直接在 TextOutput 上設定 CORS 標頭。
  */
 function doOptions(e) {
-  // 只需回傳一個空的成功 TextOutput
-  return ContentService.createTextOutput();
+  // 再次嘗試：回傳一個明確的空字串 TextOutput
+  return ContentService.createTextOutput("");
 }
 
 /**
