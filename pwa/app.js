@@ -1,6 +1,6 @@
 // --- 設定值 ---
 const CLIENT_ID = '916934078689-iiqq9op8ee3q810ut8cclhbdg470puf0.apps.googleusercontent.com';
-const SCRIPT_API_URL = 'https://script.google.com/a/macros/ichef.com.tw/s/AKfycbyMlyC2UmU3U1svtxoQNcfwuvkB88kRZ9B6dgyCiyodoPyIVuRe_3giDXmwbiqeSZXs/exec';
+const SCRIPT_API_URL = 'https://script.google.com/macros/s/AKfycbzXaR8ec2R-VQPFxqxeorqXV_O733wQccp8KTZ4lZRDEoUrluPuVuU6pwX5gSKnAAHF/exec'; // 更新為獨立 App Script URL
 const GOOGLE_MAPS_API_KEY = 'AIzaSyCwkcLZVbWHD_qPTJC5NfVDiiNSfcCH784';
 const COMPANY_DOMAIN = 'ichef.com.tw';
 
