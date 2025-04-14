@@ -129,15 +129,28 @@ async function handleLocate() {
   navigator.geolocation.getCurrentPosition(async (pos) => {
     const lat = pos.coords.latitude;
     const lng = pos.coords.longitude;
-    // 注意：Google Places API Web Service 需要後端代理或直接使用 JS SDK
-    // 這裡使用 cors-anywhere 作為範例，正式環境不建議
-    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=500&type=restaurant&language=zh-TW&key=${GOOGLE_MAPS_API_KEY}`;
-    const proxyUrl = 'https://cors-anywhere.herokuapp.com/'; // 僅供測試，需替換
 
     try {
-      const resp = await fetch(proxyUrl + url);
-      if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
-      const data = await resp.json();
+      // 改為呼叫後端 App Script API
+      const response = await fetch(SCRIPT_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + accessToken // 傳遞 Token 供後端驗證 (雖然此 API 可能不需要)
+        },
+        mode: 'cors',
+        body: JSON.stringify({
+          action: 'getNearbyPlaces',
+          lat: lat,
+          lng: lng
+        })
+      });
+
+      if (!response.ok) {
+          const errorBody = await response.text(); // 嘗試讀取錯誤訊息
+          throw new Error(`API error! status: ${response.status}, message: ${errorBody}`);
+      }
+      const data = await response.json(); // App Script 直接回傳 Google API 的 JSON
 
       loadingDiv.classList.add('hidden');
       if (data.results && data.results.length > 0) {

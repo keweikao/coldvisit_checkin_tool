@@ -29,6 +29,8 @@ function doPost(e) {
       return handleCheckIn(params, userEmail);
     } else if (params.action === 'checkout') {
       return handleCheckOut(params, userEmail);
+    } else if (params.action === 'getNearbyPlaces') {
+      return handleGetNearbyPlaces(params); // Pass params containing lat/lng
     } else {
       return jsonResponse({ error: 'Invalid action' }, 400);
     }
@@ -189,4 +191,46 @@ function jsonResponse(obj, code) {
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
   // .setResponseCode(code || 200); // setResponseCode 在某些情況下可能無效
+}
+
+/**
+ * 處理取得附近地點請求
+ */
+function handleGetNearbyPlaces(params) {
+  if (!params.lat || !params.lng) {
+    return jsonResponse({ error: 'Missing latitude or longitude' }, 400);
+  }
+
+  // 重要：將你的 Maps API Key 存在 Script Properties 中更安全
+  // const apiKey = PropertiesService.getScriptProperties().getProperty('MAPS_API_KEY');
+  // 為了簡單起見，暫時直接使用，但建議修改
+  const apiKey = 'AIzaSyCwkcLZVbWHD_qPTJC5NfVDiiNSfcCH784'; // 使用者提供的 Key
+  if (!apiKey) {
+     return jsonResponse({ error: 'Maps API Key not configured in Script Properties' }, 500);
+  }
+
+  const lat = params.lat;
+  const lng = params.lng;
+  const radius = 500;
+  const type = 'restaurant';
+  const language = 'zh-TW';
+
+  const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&language=${language}&key=${apiKey}`;
+
+  try {
+    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+
+    if (responseCode === 200) {
+      // 直接回傳 Google API 的 JSON 結果
+      return ContentService.createTextOutput(responseText).setMimeType(ContentService.MimeType.JSON);
+    } else {
+      Logger.log(`Places API Error (${responseCode}): ${responseText}`);
+      return jsonResponse({ error: `Failed to fetch places. Status: ${responseCode}`, details: responseText }, 500);
+    }
+  } catch (err) {
+    Logger.log('Error fetching places via UrlFetchApp: ' + err);
+    return jsonResponse({ error: 'Internal error fetching places: ' + err.message }, 500);
+  }
 }
