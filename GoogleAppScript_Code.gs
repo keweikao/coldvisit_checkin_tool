@@ -197,15 +197,13 @@ function handleCheckOut(params, userEmail) {
 }
 
 /**
- * JSON 回應 Helper (加入 CORS 標頭)
+ * JSON 回應 Helper
  */
 function jsonResponse(obj, code) {
-  const response = ContentService.createTextOutput(JSON.stringify(obj))
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
-  // 在實際回應中也加入 Allow-Origin 標頭
-  response.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
-  // response.setResponseCode(code || 200); // setResponseCode 在某些情況下可能無效
-  return response;
+  // .setResponseCode(code || 200); // setResponseCode 在某些情況下可能無效
 }
 
 /**
