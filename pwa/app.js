@@ -247,10 +247,17 @@ function handlePhotoChange(e) {
   reader.readAsDataURL(file);
 }
 
-// 處理送出 Check-out
-async function handleSubmitCheckout() {
-  const contactPerson = document.getElementById('contact-person').value;
-  const contactInfo = document.getElementById('contact-info').value;
+ // 處理送出 Check-out
+ async function handleSubmitCheckout() {
+   const contactPerson = document.getElementById('contact-person').value;
+   const contactInfo = document.getElementById('contact-info').value;
+
+   // Add check for accessToken before proceeding
+   if (!accessToken) {
+       alert('請先登入');
+       handleLogin(); // Or redirect to login
+       return;
+   }
 
   if (!contactPerson || !contactInfo) {
       alert('請填寫接觸人姓名與聯絡方式');
@@ -264,12 +271,13 @@ async function handleSubmitCheckout() {
   }
 
   loadingDiv.classList.remove('hidden'); // 顯示處理中
-  loadingDiv.innerText = '送出拜訪紀錄...';
+   loadingDiv.innerText = '送出拜訪紀錄...';
 
-  try {
-    const response = await fetch(SCRIPT_API_URL, {
-      method: 'POST',
-      headers: {
+   try {
+     // 改為呼叫後端 Node.js Proxy API
+     const response = await fetch(PROXY_API_URL, {
+       method: 'POST',
+       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + accessToken
       },
