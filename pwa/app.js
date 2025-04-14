@@ -1,7 +1,7 @@
 // --- 設定值 ---
 const CLIENT_ID = '916934078689-iiqq9op8ee3q810ut8cclhbdg470puf0.apps.googleusercontent.com';
-const SCRIPT_API_URL = 'https://script.google.com/macros/s/AKfycbzXaR8ec2R-VQPFxqxeorqXV_O733wQccp8KTZ4lZRDEoUrluPuVuU6pwX5gSKnAAHF/exec'; // 更新為獨立 App Script URL
-const GOOGLE_MAPS_API_KEY = 'AIzaSyCwkcLZVbWHD_qPTJC5NfVDiiNSfcCH784';
+const PROXY_API_URL = 'https://coldvisit-backend.zeabur.app/api/proxy'; // URL for the Node.js proxy backend endpoint
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCwkcLZVbWHD_qPTJC5NfVDiiNSfcCH784'; // Note: Still needed for frontend Maps JS SDK if used later
 const COMPANY_DOMAIN = 'ichef.com.tw';
 
 // --- 全域變數 ---
@@ -26,6 +26,14 @@ const durationInfo = document.getElementById('duration-info');
 
 // --- 初始化 ---
 window.onload = () => {
+  // Check for OAuth redirect hash
+  handleRedirectHash();
+
+  accessToken = localStorage.getItem('access_token');
+  visitId = localStorage.getItem('visitId');
+  placeName = localStorage.getItem('placeName');
+  placeAddress = localStorage.getItem('placeAddress');
+
   if (accessToken) {
     // 已登入
     loginSection.classList.add('hidden');
@@ -109,36 +117,62 @@ function clearVisitData() {
   localStorage.removeItem('placeAddress');
 }
 
-// 處理登入
-async function handleLogin() {
-  try {
-    const tokenResponse = await googleLogin();
-    accessToken = tokenResponse.access_token;
-    localStorage.setItem('access_token', accessToken);
-    showCheckInSection();
-  } catch (error) {
-    console.error('Login failed:', error);
-    alert('登入失敗，請重試。');
-  }
+// 處理登入 (改為頁面跳轉)
+function handleLogin() {
+    const redirectUri = window.location.origin + window.location.pathname; // Use current page
+    const scope = 'openid email profile';
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&hd=${COMPANY_DOMAIN}&prompt=select_account`;
+    // Redirect current window to Google Auth
+    window.location.href = authUrl;
 }
+
+// 處理 OAuth 回調 Hash
+function handleRedirectHash() {
+    const hash = window.location.hash.substring(1);
+    if (hash) {
+        const params = new URLSearchParams(hash);
+        const token = params.get('access_token');
+        const error = params.get('error');
+        // Clear the hash immediately
+        window.location.hash = '';
+        if (token) {
+            accessToken = token;
+            localStorage.setItem('access_token', accessToken);
+            // Don't call showCheckInSection here, let window.onload handle it
+        } else if (error) {
+            console.error('OAuth Error:', error);
+            alert('登入失敗: ' + error);
+        }
+    }
+}
+
 
 // 處理定位與取得附近店家
 async function handleLocate() {
+  if (!accessToken) {
+      alert('請先登入');
+      handleLogin();
+      return;
+  }
   loadingDiv.classList.remove('hidden');
+  loadingDiv.innerText = '定位中...';
   placesDiv.innerHTML = '';
+
   navigator.geolocation.getCurrentPosition(async (pos) => {
     const lat = pos.coords.latitude;
     const lng = pos.coords.longitude;
+    loadingDiv.innerText = '取得附近餐廳...';
 
     try {
-      // 改為呼叫後端 App Script API
-       const response = await fetch(SCRIPT_API_URL, {
+      // 呼叫後端 Node.js Proxy API
+      const response = await fetch(PROXY_API_URL, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
-            // Authorization 標頭在 getNearbyPlaces 保持移除狀態
+            'Content-Type': 'application/json',
+            // Proxy will forward Authorization if needed by App Script
+            'Authorization': 'Bearer ' + accessToken
           },
-          mode: 'cors',
+          mode: 'cors', // Still need cors mode for calling the proxy
         body: JSON.stringify({
           action: 'getNearbyPlaces',
           lat: lat,
@@ -147,10 +181,11 @@ async function handleLocate() {
       });
 
       if (!response.ok) {
-          const errorBody = await response.text(); // 嘗試讀取錯誤訊息
+          const errorBody = await response.text();
           throw new Error(`API error! status: ${response.status}, message: ${errorBody}`);
       }
-      const data = await response.json(); // App Script 直接回傳 Google API 的 JSON
+      // Assuming proxy forwards App Script's JSON response directly
+      const data = await response.json();
 
       loadingDiv.classList.add('hidden');
       if (data.results && data.results.length > 0) {
@@ -158,12 +193,11 @@ async function handleLocate() {
         data.results.forEach(place => {
           const div = document.createElement('div');
           div.className = 'place';
-          // 嘗試取得電話 (需要 Places Details API，這裡先留空)
           div.innerHTML = `
             <strong>${place.name}</strong><br/>
-            <span>地址：${place.vicinity}</span>
+            <span>地址：${place.vicinity || 'N/A'}</span>
             <span>評分：${place.rating || 'N/A'} (${place.user_ratings_total || 0} 則評論)</span>
-            <button data-placeid="${place.place_id}" data-name="${place.name}" data-address="${place.vicinity}">選擇</button>
+            <button data-placeid="${place.place_id}" data-name="${place.name}" data-address="${place.vicinity || ''}">選擇</button>
           `;
           div.querySelector('button').onclick = (e) => handleSelectPlace(e.target.dataset);
           placesDiv.appendChild(div);
@@ -174,7 +208,7 @@ async function handleLocate() {
     } catch (error) {
       console.error('Error fetching places:', error);
       loadingDiv.classList.add('hidden');
-      placesDiv.innerHTML = '取得附近餐廳時發生錯誤，請檢查網路或 API 金鑰設定。';
+      placesDiv.innerHTML = '取得附近餐廳時發生錯誤。';
       alert('取得附近餐廳失敗: ' + error.message);
     }
   }, (error) => {
@@ -187,17 +221,23 @@ async function handleLocate() {
 
 // 處理選擇店家 (Check-in)
 async function handleSelectPlace(placeData) {
-  loadingDiv.classList.remove('hidden'); // 顯示處理中
+  if (!accessToken) {
+      alert('請先登入');
+      handleLogin();
+      return;
+  }
+  loadingDiv.classList.remove('hidden');
   loadingDiv.innerText = '記錄進店資訊...';
 
   try {
-    const response = await fetch(SCRIPT_API_URL, {
+    // 呼叫後端 Node.js Proxy API
+    const response = await fetch(PROXY_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + accessToken
       },
-      mode: 'cors', // App Script 需要 CORS
+      mode: 'cors',
       body: JSON.stringify({
         action: 'checkin',
         placeId: placeData.placeid,
@@ -208,7 +248,7 @@ async function handleSelectPlace(placeData) {
     });
 
     const result = await response.json();
-    loadingDiv.classList.add('hidden'); // 隱藏處理中
+    loadingDiv.classList.add('hidden');
 
     if (result.success && result.visitId) {
       visitId = result.visitId;
@@ -270,11 +310,11 @@ function handlePhotoChange(e) {
       return;
   }
 
-  loadingDiv.classList.remove('hidden'); // 顯示處理中
-   loadingDiv.innerText = '送出拜訪紀錄...';
+  loadingDiv.classList.remove('hidden');
+  loadingDiv.innerText = '送出拜訪紀錄...';
 
-   try {
-     // 改為呼叫後端 Node.js Proxy API
+  try {
+     // 呼叫後端 Node.js Proxy API
      const response = await fetch(PROXY_API_URL, {
        method: 'POST',
        headers: {
@@ -296,7 +336,7 @@ function handlePhotoChange(e) {
     });
 
     const result = await response.json();
-    loadingDiv.classList.add('hidden'); // 隱藏處理中
+    loadingDiv.classList.add('hidden');
 
     if (result.success) {
       showDoneSection(result.durationMinutes);
@@ -311,59 +351,11 @@ function handlePhotoChange(e) {
   }
 }
 
-/**
- * Google OAuth 流程 (隱式授權) - 需在安全環境下處理 Token
- */
-async function googleLogin() {
-  return new Promise((resolve, reject) => {
-    // 注意：Implicit Grant Flow 不再推薦用於新應用，建議改用 Authorization Code Flow with PKCE
-    // 但對於純前端無後端的簡單場景，Implicit Flow 仍可使用，需注意 Token 安全
-    const redirectUri = window.location.origin + window.location.pathname; // 確保與 Console 設定一致
-    const scope = 'openid email profile'; // 移除 userinfo.email，openid 已包含
+// Google OAuth 流程 (改為頁面跳轉)
+function googleLogin() {
+    const redirectUri = window.location.origin + window.location.pathname; // Use current page
+    const scope = 'openid email profile';
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&hd=${COMPANY_DOMAIN}&prompt=select_account`;
-
-    // 簡單的 Popup 方式，可能被瀏覽器阻擋
-    // 更好的方式是頁面跳轉，或使用 Google Identity Services (GIS) Library
-    const width = 500, height = 600;
-    const left = (screen.width - width) / 2;
-    const top = (screen.height - height) / 2;
-
-    // 監聽來自 Popup 的消息或檢查 hash
-    const handleAuthResponse = (event) => {
-        // 簡單實現：假設 popup 關閉後檢查 hash
-        // 注意：這種方式不夠健壯
-        window.removeEventListener('message', handleAuthResponse); // 清理監聽器
-        const hash = window.location.hash.substring(1);
-        if (hash) {
-            const params = new URLSearchParams(hash);
-            const accessToken = params.get('access_token');
-            const error = params.get('error');
-            if (accessToken) {
-                window.location.hash = ''; // 清除 hash
-                resolve({ access_token: accessToken });
-            } else if (error) {
-                window.location.hash = ''; // 清除 hash
-                reject(new Error('OAuth Error: ' + error));
-            }
-        }
-    };
-
-    // 檢查頁面加載時是否有 hash
-    handleAuthResponse();
-
-    // 打開 Popup (可能被阻擋)
-    const authWindow = window.open(authUrl, 'GoogleLogin', `width=${width},height=${height},top=${top},left=${left}`);
-
-    // 輪詢檢查 Popup 是否關閉以及 hash (備用方案)
-    const pollTimer = window.setInterval(() => {
-      if (!authWindow || authWindow.closed) {
-        window.clearInterval(pollTimer);
-        // Popup 關閉後，再次檢查 hash
-        handleAuthResponse();
-        // 如果還是沒有 token，則認為失敗或用戶取消
-        // reject(new Error('Login cancelled or failed.')); // 避免過早 reject
-      }
-    }, 500);
-
-  });
+    // Redirect current window to Google Auth
+    window.location.href = authUrl;
 }
