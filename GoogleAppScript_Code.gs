@@ -5,6 +5,19 @@
 
 const SPREADSHEET_ID = '1iby3tt6iCBvuWJDt8aBeuJTKUVmrLgJBJljatooMIb0';
 const FOLDER_ID = '1dXsdp2AsBjP5te30Uv8IyFvjkLNWitU9';
+const ALLOWED_ORIGIN = 'https://coldvisit-checkin.zeabur.app'; // 允許的來源
+
+/**
+ * 處理 OPTIONS 預檢請求 (CORS)
+ */
+function doOptions(e) {
+  const response = ContentService.createTextOutput();
+  response.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+  response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS'); // 允許的方法
+  response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization'); // 允許的標頭
+  response.setHeader('Access-Control-Max-Age', '86400'); // 快取預檢結果一天
+  return response;
+}
 
 /**
  * 主入口，處理 POST 請求
@@ -184,13 +197,15 @@ function handleCheckOut(params, userEmail) {
 }
 
 /**
- * JSON 回應 Helper
+ * JSON 回應 Helper (加入 CORS 標頭)
  */
 function jsonResponse(obj, code) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
+  const response = ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
-  // .setResponseCode(code || 200); // setResponseCode 在某些情況下可能無效
+  // 在實際回應中也加入 Allow-Origin 標頭
+  response.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+  // response.setResponseCode(code || 200); // setResponseCode 在某些情況下可能無效
+  return response;
 }
 
 /**
