@@ -1,10 +1,10 @@
 /**
- * 每週自動產生業務拜訪月報表並發送到 Slack
+ * 每週自動產生業務地面推廣月報表並發送到 Slack
  */
 
 // --- 設定 ---
 const SPREADSHEET_ID = '1iby3tt6iCBvuWJDt8aBeuJTKUVmrLgJBJljatooMIb0'; // 你的試算表 ID
-const SOURCE_SHEET_NAME = '拜訪紀錄'; // 包含原始拜訪紀錄的工作表名稱
+const SOURCE_SHEET_NAME = '拜訪紀錄'; // 包含原始地面推廣紀錄的工作表名稱
 const REPORT_SHEET_NAME = '月報表'; // 要寫入報表的工作表名稱
 const EMAIL_COLUMN_INDEX = 1; // 業務 Email 在 SOURCE_SHEET_NAME 中的欄位索引 (B欄 = 1)
 const CHECKIN_TIME_COLUMN_INDEX = 5; // 進店時間 在 SOURCE_SHEET_NAME 中的欄位索引 (F欄 = 5)
@@ -18,7 +18,7 @@ const REVISIT_COLUMN_INDEX = 10; // 是否安排再訪 在 SOURCE_SHEET_NAME 中
  const SLACK_WEBHOOK_URL = 'https://hooks.slack.com/services/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'; // User-provided Webhook URL
 
  /**
- * 主要函數，執行報表產生邏輯並發送 Slack 通知
+ * 主要函數，執行報表產生邏輯並發送 Slack 通知 (由觸發器呼叫)
  */
 function generateMonthlyReportAndNotifySlack() {
   try {
@@ -63,8 +63,8 @@ function generateMonthlyReport() {
   const data = sourceSheet.getDataRange().getValues();
   if (data.length < 2) {
     Logger.log('來源工作表沒有足夠的資料');
-    reportSheet.getRange("A2").setValue('本月尚無拜訪紀錄');
-    return `本月 (${new Date().getMonth() + 1}月) 尚無拜訪紀錄。`; // Return summary message
+    reportSheet.getRange("A2").setValue('本月尚無地面推廣紀錄');
+    return `本月 (${new Date().getMonth() + 1}月) 尚無地面推廣紀錄。`; // Return summary message
   }
 
   const now = new Date();
@@ -104,9 +104,9 @@ function generateMonthlyReport() {
   const sortedEmails = Object.keys(stats).sort();
 
   if (sortedEmails.length === 0) {
-      Logger.log('本月尚無符合條件的拜訪紀錄');
-      reportSheet.getRange("A2").setValue('本月尚無拜訪紀錄');
-      return `本月 (${currentMonth + 1}月) 尚無符合條件的拜訪紀錄。`; // Return summary message
+      Logger.log('本月尚無符合條件的地面推廣紀錄');
+      reportSheet.getRange("A2").setValue('本月尚無地面推廣紀錄');
+      return `本月 (${currentMonth + 1}月) 尚無符合條件的地面推廣紀錄。`; // Return summary message
   }
 
   let totalCheckins = 0;
@@ -127,7 +127,7 @@ function generateMonthlyReport() {
 
   // 產生摘要訊息
   const sheetUrl = ss.getUrl();
-  const reportSummary = `*陌生開發 ${currentMonth + 1} 月報表已更新*\n` +
+  const reportSummary = `*地面推廣 ${currentMonth + 1} 月報表已更新*\n` + // Updated terminology
                         `本月總打卡數：${totalCheckins}\n` +
                         `本月安排再訪數：${totalRevisits}\n` +
                         `詳細報表連結：${sheetUrl}`;
@@ -144,30 +144,15 @@ function generateMonthlyReport() {
 
    if (!webhookUrl || webhookUrl === 'YOUR_SLACK_WEBHOOK_URL_HERE') { // Added check for placeholder
      Logger.log('錯誤：尚未設定有效的 SLACK_WEBHOOK_URL 常數');
-    // 可選擇在此處拋出錯誤或僅記錄日誌
-    // throw new Error('Slack Webhook URL not configured.');
     return; // Or simply don't send if URL is missing
   }
 
-  const payload = {
-    text: message,
-    // 你可以加入更多 Slack 訊息格式選項，例如 blocks:
-    // blocks: [
-    //   {
-    //     "type": "section",
-    //     "text": {
-    //       "type": "mrkdwn",
-    //       "text": message
-    //     }
-    //   }
-    // ]
-  };
-
+  const payload = { text: message };
   const options = {
     method: 'post',
     contentType: 'application/json',
     payload: JSON.stringify(payload),
-    muteHttpExceptions: true // 避免 Slack 回應非 200 時直接拋錯
+    muteHttpExceptions: true
   };
 
   try {
@@ -175,7 +160,6 @@ function generateMonthlyReport() {
     const response = UrlFetchApp.fetch(webhookUrl, options);
     const responseCode = response.getResponseCode();
     const responseText = response.getContentText();
-
     if (responseCode === 200 && responseText === 'ok') {
       Logger.log('訊息成功發送到 Slack');
     } else {
@@ -195,12 +179,10 @@ function createWeeklyTrigger() {
   // 先刪除可能存在的舊觸發器，避免重複建立
   const triggers = ScriptApp.getProjectTriggers();
   for (const trigger of triggers) {
-    // 更新要檢查和刪除的函數名稱
     if (trigger.getHandlerFunction() === 'generateMonthlyReportAndNotifySlack') {
       ScriptApp.deleteTrigger(trigger);
       Logger.log('已刪除舊的 generateMonthlyReportAndNotifySlack 觸發器');
     }
-     // 也刪除舊的 generateMonthlyReport 觸發器 (如果存在)
      if (trigger.getHandlerFunction() === 'generateMonthlyReport') {
       ScriptApp.deleteTrigger(trigger);
       Logger.log('已刪除舊的 generateMonthlyReport 觸發器');
