@@ -136,22 +136,29 @@ app.post('/api/checkin', async (req, res) => {
   }
 });
 
-// POST Check-out
-// TODO: Implement proper user authentication/identification middleware
-app.post('/api/checkout', async (req, res) => {
-  const { visitId, contactPerson, contactInfo, revisitNeeded, notes, photoBase64, photoMimeType, photoFilename } = req.body;
-  const authHeader = req.headers.authorization;
-  let userEmail = 'unknown@example.com'; // Default
+ // POST Check-out
+ // TODO: Implement proper user authentication/identification middleware
+ app.post('/api/checkout', async (req, res) => {
+   // Destructure new field: contactRole and handle conditional fields
+   const { visitId, contactRole, revisitNeeded, notes, photoBase64, photoMimeType, photoFilename } = req.body;
+   const contactPerson = revisitNeeded ? req.body.contactPerson : '';
+   const contactInfo = revisitNeeded ? req.body.contactInfo : '';
+   const authHeader = req.headers.authorization;
+   let userEmail = 'unknown@example.com'; // Default
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       console.log("Received token (verification not implemented):", token);
-      // Add token verification logic here if needed
-  }
+       // Add token verification logic here if needed
+   }
 
-  if (!visitId || !contactPerson || !contactInfo) {
-    return res.status(400).json({ error: 'Missing visitId, contactPerson, or contactInfo' });
-  }
+   // Validate required fields based on revisitNeeded
+   if (!visitId || !contactRole) { // contactRole is always required now
+       return res.status(400).json({ error: 'Missing visitId or contactRole' });
+   }
+   if (revisitNeeded && (!contactPerson || !contactInfo)) {
+       return res.status(400).json({ error: 'Missing contactPerson or contactInfo when revisit is needed' });
+   }
 
   try {
     const auth = await createGoogleAuthClient();
@@ -236,11 +243,13 @@ app.post('/api/checkout', async (req, res) => {
         { range: `${SHEET_NAME}!I${rowIndex}`, values: [[contactPerson]] },     // Col I: Contact Person
         { range: `${SHEET_NAME}!J${rowIndex}`, values: [[contactInfo]] },       // Col J: Contact Info
         { range: `${SHEET_NAME}!K${rowIndex}`, values: [[revisitNeeded ? '是' : '否']] }, // Col K: Revisit
-        { range: `${SHEET_NAME}!L${rowIndex}`, values: [[photoUrl]] },          // Col L: Photo Link
-        { range: `${SHEET_NAME}!M${rowIndex}`, values: [[notes || '']] },       // Col M: Notes
-    ];
+         { range: `${SHEET_NAME}!L${rowIndex}`, values: [[contactRole]] },       // Col L: Contact Role (NEW)
+         { range: `${SHEET_NAME}!M${rowIndex}`, values: [[photoUrl]] },          // Col M: Photo Link (Shifted)
+         { range: `${SHEET_NAME}!N${rowIndex}`, values: [[notes || '']] },       // Col N: Notes (Shifted)
+     ];
+     // IMPORTANT: Adjust the range in the initial rangeData fetch if needed (e.g., A:N if reading all)
 
-    console.log(`Updating sheet row ${rowIndex}`);
+     console.log(`Updating sheet row ${rowIndex}`);
     const result = await sheets.spreadsheets.values.batchUpdate({
         spreadsheetId: SPREADSHEET_ID,
         requestBody: {

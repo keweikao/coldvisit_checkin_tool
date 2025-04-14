@@ -48,28 +48,41 @@ label { display: block; margin-top: 0.8em; font-weight: bold; color: #555; }
     </div>
     <label for="photo-input">拍照：</label>
     <input type="file" accept="image/*" capture="environment" id="photo-input" />
-    <img id="photo-preview" alt="照片預覽" style="display:none;" />
+     <img id="photo-preview" alt="照片預覽" style="display:none;" />
 
-    <label for="contact-person">接觸人姓名：</label>
-    <input id="contact-person" required />
+     <label for="contact-role">接觸人員角色：</label>
+     <select id="contact-role" required>
+         <option value="" disabled selected>請選擇...</option>
+         <option value="店員">店員</option>
+         <option value="店長/經理">店長/經理</option>
+         <option value="老闆">老闆</option>
+         <option value="其他">其他</option>
+     </select>
 
-    <label for="contact-info">聯絡方式：</label>
-    <input id="contact-info" required />
+     <label for="revisit-needed">是否安排再訪：</label>
+     <select id="revisit-needed">
+       <option value="否" selected>否</option>
+       <option value="是">是</option>
+     </select>
 
-    <label for="revisit-needed">是否安排再訪：</label>
-    <select id="revisit-needed">
-      <option value="是">是</option>
-      <option value="否" selected>否</option>
-    </select>
+     <!-- Conditional Fields -->
+     <div id="contact-details" class="hidden">
+         <label for="contact-person">聯絡人姓名：</label>
+         <input id="contact-person" />
 
-    <label for="notes">備註：</label>
+         <label for="contact-info">聯絡電話：</label>
+         <input id="contact-info" type="tel" />
+     </div>
+
+     <label for="notes">備註：</label>
     <textarea id="notes" rows="3"></textarea>
 
-    <button id="submit-checkout">送出紀錄</button>
-    <button id="cancel-checkout" type="button" style="background-color:#6c757d; margin-left: 10px;">取消本次紀錄</button>
-  </div>
+     <button id="submit-checkout">送出紀錄</button>
+     <button id="back-to-map" type="button" style="background-color:#6c757d; margin-left: 10px;">返回地圖</button>
+     <!-- Removed cancel button, back button serves similar purpose -->
+   </div>
 
-  <div id="done-section" class="hidden">
+   <div id="done-section" class="hidden">
     <h2>拜訪完成！</h2>
     <p id="duration-info"></p>
     <button onclick="showCheckInSection()">記錄下一家</button>

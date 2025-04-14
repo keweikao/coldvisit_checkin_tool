@@ -29,6 +29,8 @@ const mapDiv = document.getElementById('map'); // Map container
 const selectedPlaceDiv = document.getElementById('selected-place');
 const photoPreview = document.getElementById('photo-preview');
 const durationInfo = document.getElementById('duration-info');
+const contactDetailsDiv = document.getElementById('contact-details'); // Div for conditional fields
+const revisitNeededSelect = document.getElementById('revisit-needed'); // Select element
 
  // --- Initialization ---
  window.onload = () => {
@@ -76,11 +78,12 @@ const durationInfo = document.getElementById('duration-info');
  // initMap is called by the Google Maps script callback
 
  // --- Event Listeners ---
-document.getElementById('login-btn').onclick = handleLogin;
-// Removed locate-btn listener
-document.getElementById('photo-input').onchange = handlePhotoChange;
-document.getElementById('submit-checkout').onclick = handleSubmitCheckout;
-document.getElementById('cancel-checkout').onclick = cancelCheckout; // Added cancel button listener
+ document.getElementById('login-btn').onclick = handleLogin;
+ // Removed locate-btn listener
+ document.getElementById('photo-input').onchange = handlePhotoChange;
+ document.getElementById('submit-checkout').onclick = handleSubmitCheckout;
+ document.getElementById('back-to-map').onclick = handleBackToMap; // Listener for new back button
+ document.getElementById('revisit-needed').onchange = toggleContactDetails; // Listener for conditional fields
 
 // --- Map Initialization (Called by Google Maps API) ---
 function initMap() {
@@ -128,35 +131,29 @@ function getCurrentLocationAndLoadMap() {
       (error) => {
         console.error("Geolocation error:", error);
         loadingMapDiv.innerText = '無法取得位置，請允許權限。';
-        // Optionally default to a fallback location
-        // createMap({ lat: 25.034, lng: 121.564 }); // Example: Taipei 101
         alert(`無法取得位置: ${error.message}`);
       },
       { enableHighAccuracy: true }
     );
   } else {
-    // Browser doesn't support Geolocation
     loadingMapDiv.innerText = '瀏覽器不支援定位功能。';
     alert('瀏覽器不支援定位功能。');
-    // Optionally default to a fallback location
-    // createMap({ lat: 25.034, lng: 121.564 });
   }
 }
 
 function createMap(location) {
   map = new google.maps.Map(mapDiv, {
     center: location,
-    zoom: 16, // Adjust zoom level as needed
+    zoom: 17, // Zoom in a bit more for closer radius
     mapTypeControl: false,
     streetViewControl: false,
   });
 
-  // Add a marker for the user's current location
   new google.maps.Marker({
       position: location,
       map: map,
       title: "我的位置",
-      icon: { // Optional: style user marker differently
+      icon: {
           path: google.maps.SymbolPath.CIRCLE,
           scale: 8,
           fillColor: "#4285F4",
@@ -167,7 +164,6 @@ function createMap(location) {
    });
 
    infoWindow = new google.maps.InfoWindow();
-   // Ensure Places library is loaded before creating service
    if (google.maps.places && google.maps.places.PlacesService) {
        console.log("Places library loaded, creating PlacesService.");
        placesService = new google.maps.places.PlacesService(map);
@@ -175,7 +171,7 @@ function createMap(location) {
        console.error("Places library not loaded when trying to create PlacesService!");
        alert("地圖地點服務載入失敗，請重新整理頁面。");
        loadingMapDiv.innerText = '地圖地點服務載入失敗。';
-       return; // Stop further execution if PlacesService is unavailable
+       return;
    }
  }
 
@@ -193,8 +189,8 @@ function createMap(location) {
    }
 
    placesService.nearbySearch(request, (results, status) => {
-     console.log("nearbySearch callback status:", status); // Log the status
-     loadingMapDiv.classList.add('hidden'); // Hide loading message
+     console.log("nearbySearch callback status:", status);
+     loadingMapDiv.classList.add('hidden');
      if (status === google.maps.places.PlacesServiceStatus.OK && results) {
       console.log(`Found ${results.length} places nearby.`);
       clearMarkers();
@@ -203,7 +199,7 @@ function createMap(location) {
       }
     } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
         console.log("No places found nearby.");
-        alert("附近找不到符合條件的地點。");
+        alert("附近 50 公尺內找不到地點標記。"); // More specific message
     } else {
         console.error("Places API search failed:", status);
         alert("搜尋附近地點時發生錯誤: " + status);
@@ -220,7 +216,7 @@ function createMarker(place) {
     title: place.name
   });
 
-  markers.push(marker); // Add marker to array
+  markers.push(marker);
 
   google.maps.event.addListener(marker, "click", () => {
     const content = `
@@ -235,7 +231,6 @@ function createMarker(place) {
   });
 }
 
-// Helper to clear existing markers
 function clearMarkers() {
     for (let i = 0; i < markers.length; i++) {
         markers[i].setMap(null);
@@ -243,22 +238,18 @@ function clearMarkers() {
     markers = [];
 }
 
-// Helper to escape strings for use in JS function calls within HTML
 function escapeJS(str) {
     if (!str) return '';
     return str.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n');
 }
 
-
-// --- Original Functions Modified/Kept ---
-
-// 顯示不同區塊 (Adjusted)
+// --- UI Section Toggling ---
 function showLoginSection() {
   loginSection.classList.remove('hidden');
   checkinSection.classList.add('hidden');
   checkoutSection.classList.add('hidden');
   doneSection.classList.add('hidden');
-  mapDiv.style.display = 'none'; // Hide map when logged out
+  mapDiv.style.display = 'none';
   loadingMapDiv.classList.add('hidden');
 }
 function showCheckInSection() {
@@ -266,43 +257,49 @@ function showCheckInSection() {
   checkinSection.classList.remove('hidden');
   checkoutSection.classList.add('hidden');
   doneSection.classList.add('hidden');
-  mapDiv.style.display = 'block'; // Show map
-  loadingMapDiv.classList.remove('hidden'); // Show loading initially
+  mapDiv.style.display = 'block';
+  loadingMapDiv.classList.remove('hidden');
   clearVisitData();
-  // Map initialization is now triggered by initMap -> getCurrentLocationAndLoadMap
+   if (typeof google === 'object' && typeof google.maps === 'object' && !map) {
+        getCurrentLocationAndLoadMap();
+   } else if (map) {
+       // If map already exists, maybe re-search or just ensure it's visible
+       loadingMapDiv.classList.add('hidden'); // Hide loading if map exists
+   }
 }
 function showCheckoutSection() {
   loginSection.classList.add('hidden');
   checkinSection.classList.add('hidden');
   checkoutSection.classList.remove('hidden');
   doneSection.classList.add('hidden');
-  mapDiv.style.display = 'none'; // Hide map during checkout
+  mapDiv.style.display = 'none';
   loadingMapDiv.classList.add('hidden');
-  // 顯示已選店家資訊
   selectedPlaceDiv.innerHTML = `
     <strong>${placeName}</strong><br/>
     <span>地址：${placeAddress || 'N/A'}</span>
   `;
-  // 清空表單和照片預覽
+  // Reset form fields
   document.getElementById('photo-input').value = '';
   photoPreview.style.display = 'none';
   photoPreview.src = '';
+  document.getElementById('contact-role').value = '';
+  revisitNeededSelect.value = '否'; // Default to No
   document.getElementById('contact-person').value = '';
   document.getElementById('contact-info').value = '';
-  document.getElementById('revisit-needed').value = '否';
   document.getElementById('notes').value = '';
+  toggleContactDetails(); // Ensure conditional fields are hidden initially
 }
 function showDoneSection(durationMinutes) {
   loginSection.classList.add('hidden');
   checkinSection.classList.add('hidden');
   checkoutSection.classList.add('hidden');
   doneSection.classList.remove('hidden');
-  mapDiv.style.display = 'none'; // Hide map on done screen
+  mapDiv.style.display = 'none';
   loadingMapDiv.classList.add('hidden');
   durationInfo.innerText = `拜訪時間：約 ${durationMinutes} 分鐘`;
 }
 
-// 清除拜訪暫存資料
+// --- Data Handling ---
 function clearVisitData() {
   visitId = null;
   placeName = null;
@@ -315,49 +312,44 @@ function clearVisitData() {
   localStorage.removeItem('placeAddress');
 }
 
-// 處理登入 (改為頁面跳轉)
+// --- Auth ---
 function handleLogin() {
-    const redirectUri = window.location.origin + window.location.pathname; // Use current page
+    const redirectUri = window.location.origin + window.location.pathname;
     const scope = 'openid email profile';
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&hd=${COMPANY_DOMAIN}&prompt=select_account`;
-    // Redirect current window to Google Auth
     window.location.href = authUrl;
 }
 
-// 處理 OAuth 回調 Hash
 function handleRedirectHash() {
     const hash = window.location.hash.substring(1);
     if (hash) {
         const params = new URLSearchParams(hash);
         const token = params.get('access_token');
         const error = params.get('error');
-        // Clear the hash immediately
-        window.location.hash = '';
+        window.location.hash = ''; // Clear hash immediately
         if (token) {
             accessToken = token;
             localStorage.setItem('access_token', accessToken);
-            // Reload the page to trigger window.onload correctly
-            window.location.reload();
+            // Important: Don't reload here, let onload finish naturally
         } else if (error) {
             console.error('OAuth Error:', error);
             alert('登入失敗: ' + error);
+            localStorage.removeItem('access_token'); // Clear any potentially bad token
         }
     }
 }
 
-// 處理從地圖 InfoWindow 選擇店家 (Check-in)
+// --- API Calls ---
+
+// Check-in Call (Triggered from Map InfoWindow)
 async function handleSelectPlaceFromMap(pId, pName, pAddress) {
   if (!accessToken) {
       alert('請先登入');
       handleLogin();
       return;
   }
-  // Close the info window
-  if (infoWindow) {
-      infoWindow.close();
-  }
+  if (infoWindow) infoWindow.close();
 
-  // Show loading indicator on the controls panel
   const controlsLoading = document.createElement('div');
   controlsLoading.id = 'controls-loading';
   controlsLoading.innerText = '記錄進店資訊...';
@@ -365,47 +357,35 @@ async function handleSelectPlaceFromMap(pId, pName, pAddress) {
   controlsLoading.style.textAlign = 'center';
   checkinSection.appendChild(controlsLoading);
 
-
   try {
-    // Call the backend Node.js API
     const response = await fetch(`${API_BASE_URL}/api/checkin`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + accessToken
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
       mode: 'cors',
-      body: JSON.stringify({
-        // action: 'checkin', // Action might be implicit in the endpoint now
-        placeId: pId,
-        placeName: pName,
-        placeAddress: pAddress,
-        placePhone: '' // Still need details API for phone
-      })
+      body: JSON.stringify({ placeId: pId, placeName: pName, placeAddress: pAddress, placePhone: '' })
     });
-
     const result = await response.json();
-    checkinSection.removeChild(controlsLoading); // Remove loading indicator
+    checkinSection.removeChild(controlsLoading);
 
-    if (result.success && result.visitId) {
+    if (response.ok && result.success && result.visitId) {
       visitId = result.visitId;
       placeName = pName;
       placeAddress = pAddress;
       localStorage.setItem('visitId', visitId);
       localStorage.setItem('placeName', placeName);
       localStorage.setItem('placeAddress', placeAddress);
-      showCheckoutSection(); // Switch to checkout view
+      showCheckoutSection();
     } else {
-      throw new Error(result.error || 'Check-in API failed');
+      throw new Error(result.error || `Check-in API failed with status ${response.status}`);
     }
   } catch (error) {
     console.error('Check-in failed:', error);
-    checkinSection.removeChild(controlsLoading); // Remove loading indicator
+    checkinSection.removeChild(controlsLoading);
     alert('記錄進店資訊失敗: ' + error.message);
   }
 }
 
-// 處理照片選擇 (No change needed)
+// Photo Handling
 function handlePhotoChange(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -413,41 +393,43 @@ function handlePhotoChange(e) {
   photoFilename = file.name;
   const reader = new FileReader();
   reader.onload = () => {
-    photoBase64 = reader.result; // 包含 data:image/...;base64,
+    photoBase64 = reader.result;
     photoPreview.src = photoBase64;
     photoPreview.style.display = 'block';
   };
   reader.onerror = (error) => {
     console.error('Error reading file:', error);
     alert('讀取照片失敗');
+    photoPreview.style.display = 'none';
+    photoBase64 = '';
   };
   reader.readAsDataURL(file);
 }
 
- // 處理送出 Check-out (No change needed in API call itself)
+ // Check-out Call
  async function handleSubmitCheckout() {
-   const contactPerson = document.getElementById('contact-person').value;
-   const contactInfo = document.getElementById('contact-info').value;
+   const contactRole = document.getElementById('contact-role').value;
+   const revisitNeeded = revisitNeededSelect.value === '是';
+   const contactPersonInput = document.getElementById('contact-person');
+   const contactInfoInput = document.getElementById('contact-info');
+   const notes = document.getElementById('notes').value;
 
-   // Add check for accessToken before proceeding
-   if (!accessToken) {
-       alert('請先登入');
-       handleLogin(); // Or redirect to login
-       return;
+   let contactPerson = '';
+   let contactInfo = '';
+
+   if (!accessToken) { alert('請先登入'); handleLogin(); return; }
+   if (!contactRole) { alert('請選擇接觸人員角色'); return; }
+   if (!visitId) { alert('發生錯誤，找不到拜訪 ID'); clearVisitData(); showCheckInSection(); return; }
+
+   if (revisitNeeded) {
+       contactPerson = contactPersonInput.value.trim();
+       contactInfo = contactInfoInput.value.trim();
+       if (!contactPerson || !contactInfo) {
+           alert('預計再訪時，請填寫聯絡人姓名與聯絡電話');
+           return;
+       }
    }
 
-  if (!contactPerson || !contactInfo) {
-      alert('請填寫接觸人姓名與聯絡方式');
-      return;
-  }
-  if (!visitId) {
-      alert('發生錯誤，找不到拜訪 ID，請重新開始');
-      clearVisitData();
-      showCheckInSection(); // Go back to checkin/map view
-      return;
-  }
-
-  // Show loading indicator on controls
   const controlsLoading = document.createElement('div');
   controlsLoading.id = 'controls-loading';
   controlsLoading.innerText = '送出拜訪紀錄...';
@@ -455,54 +437,57 @@ function handlePhotoChange(e) {
   controlsLoading.style.textAlign = 'center';
   checkoutSection.appendChild(controlsLoading);
 
-
   try {
-      // Call the backend Node.js API
       const response = await fetch(`${API_BASE_URL}/api/checkout`, {
         method: 'POST',
-        headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + accessToken
-      },
-      mode: 'cors',
-      body: JSON.stringify({
-        // action: 'checkout', // Action might be implicit
-        visitId: visitId,
-        contactPerson: contactPerson,
-        contactInfo: contactInfo,
-        revisitNeeded: document.getElementById('revisit-needed').value === '是',
-        notes: document.getElementById('notes').value,
-        photoBase64: photoBase64, // 包含 data URI scheme
-        photoMimeType: photoMimeType,
-        photoFilename: photoFilename
-      })
-    });
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+        mode: 'cors',
+        body: JSON.stringify({
+          visitId: visitId,
+          contactRole: contactRole,
+          revisitNeeded: revisitNeeded,
+          contactPerson: contactPerson,
+          contactInfo: contactInfo,
+          notes: notes,
+          photoBase64: photoBase64,
+          photoMimeType: photoMimeType,
+          photoFilename: photoFilename
+        })
+      });
 
-    const result = await response.json();
-    checkoutSection.removeChild(controlsLoading); // Remove loading
+      const result = await response.json();
+      checkoutSection.removeChild(controlsLoading);
 
-    if (result.success) {
-      showDoneSection(result.durationMinutes);
-      clearVisitData(); // Clear data for next visit
-    } else {
-      throw new Error(result.error || 'Check-out API failed');
-    }
+      if (response.ok && result.success) {
+        showDoneSection(result.durationMinutes);
+        clearVisitData();
+      } else {
+        throw new Error(result.error || `Check-out API failed with status ${response.status}`);
+      }
   } catch (error) {
     console.error('Check-out failed:', error);
-    checkoutSection.removeChild(controlsLoading); // Remove loading
+    checkoutSection.removeChild(controlsLoading);
     alert('送出紀錄失敗: ' + error.message);
   }
 }
 
-// Handle Cancel Checkout
-function cancelCheckout() {
-    if (confirm("確定要取消本次拜訪紀錄嗎？(Check-in 資料將被保留，但無法完成 Check-out)")) {
-        // Just clear the form and go back to checkin/map view
-        // Keep visitId etc. in localStorage in case user wants to resume? Or clear it?
-        // Let's clear it for simplicity now.
-        clearVisitData();
+// --- UI Logic Functions ---
+
+// Toggle visibility of contact details based on revisit selection
+function toggleContactDetails() {
+    if (revisitNeededSelect.value === '是') {
+        contactDetailsDiv.classList.remove('hidden');
+    } else {
+        contactDetailsDiv.classList.add('hidden');
+    }
+}
+
+// Handle "Back to Map" button click
+function handleBackToMap() {
+    if (confirm("確定要返回地圖嗎？目前填寫的 Check-out 資料將不會儲存。")) {
+        // Don't clear visitId/placeName from localStorage, just go back
         showCheckInSection();
-        // Reload map if needed, or assume user will re-trigger location
+        // Reload map
         getCurrentLocationAndLoadMap();
     }
 }
