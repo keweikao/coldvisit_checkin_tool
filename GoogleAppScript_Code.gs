@@ -5,7 +5,7 @@
 
 const SPREADSHEET_ID = '1iby3tt6iCBvuWJDt8aBeuJTKUVmrLgJBJljatooMIb0';
 const FOLDER_ID = '1dXsdp2AsBjP5te30Uv8IyFvjkLNWitU9';
-const ALLOWED_ORIGIN = 'https://coldvisit-checkin.zeabur.app'; // 允許的來源
+const ALLOWED_ORIGIN = '*'; // 改為萬用字元測試
 
 /**
  * 處理 OPTIONS 預檢請求 (CORS)
