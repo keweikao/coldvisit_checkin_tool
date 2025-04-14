@@ -69,8 +69,16 @@ function doPost(e) {
  * 取得 Bearer Token
  */
 function getBearerToken(e) {
+  // 增加對 e.headers 的檢查
+  if (!e || !e.headers) {
+      Logger.log('getBearerToken: e.headers is undefined or missing.');
+      return null;
+  }
   const authHeader = e.headers['Authorization'] || e.headers['authorization'];
-  if (!authHeader) return null;
+  if (!authHeader) {
+      Logger.log('getBearerToken: Authorization header is missing.');
+      return null;
+  }
   const parts = authHeader.split(' ');
   return parts.length === 2 ? parts[1] : null;
 }
