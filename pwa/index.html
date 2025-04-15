@@ -2,13 +2,13 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8" />
-<title>陌生開發拜訪紀錄</title>
+<title>地面推廣拜訪紀錄</title> <!-- Changed Title -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <style>
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 0; margin: 0; display: flex; flex-direction: column; height: 100vh; }
 #map-container { flex-grow: 1; position: relative; background-color: #e0e0e0; /* Placeholder color */ }
 #map { height: 100%; width: 100%; }
-#controls { padding: 1em; background-color: #f4f4f4; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); z-index: 10; }
+#controls { padding: 1em; background-color: #f4f4f4; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); z-index: 10; max-height: 50vh; overflow-y: auto; /* Allow controls to scroll if needed */ }
 h1, h2 { color: #333; margin-top: 0; }
 button { font-size: 1.1em; margin: 0.5em 0; padding: 0.8em 1.2em; cursor: pointer; border: none; border-radius: 5px; background-color: #007bff; color: white; }
 button:hover { background-color: #0056b3; }
@@ -16,36 +16,36 @@ input, select, textarea { font-size: 1em; width: calc(100% - 1.2em); margin: 0.5
 label { display: block; margin-top: 0.8em; font-weight: bold; color: #555; }
 .hidden { display: none; }
 #selected-place { background-color: #e9ecef; padding: 0.8em; border-radius: 5px; margin-bottom: 1em; }
-#photo-preview { max-width: 100%; margin-top: 0.5em; border-radius: 5px; border: 1px solid #ddd; }
+#photo-preview { max-width: 100%; max-height: 150px; /* Limit preview height */ object-fit: cover; margin-top: 0.5em; border-radius: 5px; border: 1px solid #ddd; }
 #loading-map { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.8); padding: 1em; border-radius: 5px; z-index: 20; }
 /* InfoWindow Styles */
 .gm-style .gm-style-iw-c { padding: 10px !important; }
-.gm-style .gm-style-iw-d { overflow: hidden !important; padding-right: 10px !important; }
+.gm-style .gm-style-iw-d { overflow: auto !important; padding-right: 10px !important; max-height: 150px !important; /* Limit InfoWindow height */ }
 .infowindow-content strong { display: block; margin-bottom: 5px; }
 .infowindow-content span { display: block; font-size: 0.9em; color: #555; margin-bottom: 8px; }
 .infowindow-content button { font-size: 0.9em; padding: 5px 10px; margin-top: 5px; }
+/* Center GIS Button */
+#login-section { display: flex; justify-content: center; align-items: center; min-height: 100px; /* Adjust as needed */ }
 </style>
 </head>
 <body>
 
 <div id="controls">
-  <h1>陌生開發拜訪紀錄</h1>
+   <h1>地面推廣拜訪紀錄</h1> <!-- Changed Title -->
 
-  <div id="login-section">
-    <button id="login-btn">使用 @ichef.com.tw 登入</button>
-  </div>
+   <div id="login-section">
+     <button id="login-btn">使用 @ichef.com.tw 登入</button> <!-- Reverted to original button -->
+   </div>
 
-  <div id="checkin-section" class="hidden">
+   <div id="checkin-section" class="hidden">
     <h2>1. 在地圖上選擇拜訪店家</h2>
-    <p>正在取得您的位置並載入附近店家...</p>
-    <!-- 地圖會顯示在下方 -->
+    <p id="checkin-instructions">請點擊地圖上的標記選擇店家，或在地圖空白處點擊以手動新增。</p>
+    <!-- Map is displayed below -->
   </div>
 
   <div id="checkout-section" class="hidden">
     <h2>2. 完成拜訪紀錄</h2>
-    <div id="selected-place">
-      <!-- 店家資訊會顯示在這裡 -->
-    </div>
+    <div id="selected-place"></div>
     <label for="photo-input">拍照：</label>
     <input type="file" accept="image/*" capture="environment" id="photo-input" />
      <img id="photo-preview" alt="照片預覽" style="display:none;" />
@@ -65,11 +65,9 @@ label { display: block; margin-top: 0.8em; font-weight: bold; color: #555; }
        <option value="是">是</option>
      </select>
 
-     <!-- Conditional Fields -->
      <div id="contact-details" class="hidden">
          <label for="contact-person">聯絡人姓名：</label>
          <input id="contact-person" />
-
          <label for="contact-info">聯絡電話：</label>
          <input id="contact-info" type="tel" />
      </div>
@@ -79,14 +77,9 @@ label { display: block; margin-top: 0.8em; font-weight: bold; color: #555; }
 
      <button id="submit-checkout">送出紀錄</button>
      <button id="back-to-map" type="button" style="background-color:#6c757d; margin-left: 10px;">返回地圖</button>
-     <!-- Removed cancel button, back button serves similar purpose -->
    </div>
 
-   <div id="done-section" class="hidden">
-    <h2>拜訪完成！</h2>
-    <p id="duration-info"></p>
-    <button onclick="showCheckInSection()">記錄下一家</button>
-  </div>
+   <!-- Removed Done Section -->
 </div>
 
 <div id="map-container">
@@ -94,14 +87,15 @@ label { display: block; margin-top: 0.8em; font-weight: bold; color: #555; }
   <div id="map"></div>
 </div>
 
-<!-- *** 修改這裡 *** -->
-<!-- 載入 Google Maps JavaScript API，包含 places 函式庫 -->
-<!-- 將 YOUR_GOOGLE_MAPS_API_KEY 替換成你的金鑰 -->
-<!-- callback=initMap 表示 API 載入完成後會呼叫 app.js 中的 initMap 函數 -->
+<!-- Load Google Identity Services (GIS) client library -->
+ <!-- Removed GIS script -->
+
+ <!-- Load Google Maps JavaScript API, including places library -->
+ <!-- Ensure API Key has Maps JS API & Places API enabled -->
+<!-- callback=initMap tells API to call global initMap() function once loaded -->
 <script async defer
     src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCwkcLZVbWHD_qPTJC5NfVDiiNSfcCH784&libraries=places&callback=initMap&language=zh-TW&region=TW">
 </script>
-<!-- *** 修改結束 *** -->
 
 <script src="app.js"></script>
 </body>

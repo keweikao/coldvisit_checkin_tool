@@ -3,7 +3,7 @@ import fetch from 'node-fetch';
 import cors from 'cors';
 import { google } from 'googleapis';
 import { GoogleAuth } from 'google-auth-library';
-import { OAuth2Client } from 'google-auth-library'; // Import OAuth2Client for ID Token verification
+// Removed OAuth2Client import
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { PassThrough } from 'stream';
@@ -16,7 +16,7 @@ const SPREADSHEET_ID = '1iby3tt6iCBvuWJDt8aBeuJTKUVmrLgJBJljatooMIb0';
 const SHEET_NAME = '拜訪紀錄';
 const DRIVE_FOLDER_ID = '13kgNwlFW4uU-XCRjuFW-UFU5Pbrp1MzT';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyCwkcLZVbWHD_qPTJC5NfVDiiNSfcCH784';
-const GOOGLE_OAUTH_CLIENT_ID = '916934078689-iiqq9op8ee3q810ut8cclhbdg470puf0.apps.googleusercontent.com'; // Renamed for clarity
+const EXPECTED_OAUTH_CLIENT_ID = '916934078689-iiqq9op8ee3q810ut8cclhbdg470puf0.apps.googleusercontent.com'; // For Access Token verification
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,7 +27,6 @@ const KEY_FILE_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(__
 // --- Google API Auth (Service Account) ---
 const SCOPES_SA = [ 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file' ];
 async function createServiceAccountAuthClient() {
-  // Renamed function for clarity
   try {
     if (KEY_JSON_CONTENT) {
       console.log("Authenticating Service Account using GOOGLE_CREDENTIALS_JSON environment variable.");
@@ -45,62 +44,48 @@ async function createServiceAccountAuthClient() {
   }
 }
 
-// --- Google ID Token Verification ---
-const oauth2Client = new OAuth2Client(GOOGLE_OAUTH_CLIENT_ID);
-async function verifyGoogleIdToken(idToken) {
-  if (!idToken) return null;
+// --- Google OAuth Access Token Verification (Reverted) ---
+async function verifyGoogleOAuthToken(token) {
+  // Reverted to use tokeninfo endpoint for Access Tokens
+  if (!token) return null;
   try {
-    console.log("Verifying ID Token...");
-    const ticket = await oauth2Client.verifyIdToken({
-        idToken: idToken,
-        audience: GOOGLE_OAUTH_CLIENT_ID, // Specify the CLIENT_ID of the app that accesses the backend
-    });
-    const payload = ticket.getPayload();
-    if (!payload) { throw new Error('Invalid ID token payload'); }
-
-    // Optional: Verify issuer
-    // if (!payload.iss || !payload.iss.includes('accounts.google.com')) {
-    //   throw new Error('Invalid issuer');
-    // }
-
-    // Optional: Verify domain (hd claim)
-    // if (payload.hd !== 'ichef.com.tw') {
-    //   throw new Error(`Unauthorized domain: ${payload.hd}`);
-    // }
-
-    if (payload.email && payload.email_verified) {
-      console.log(`ID Token verified for email: ${payload.email}`);
-      return payload.email; // Return verified email
-    } else {
-      throw new Error('Email not verified or missing in ID token');
+    const response = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Token verification failed (${response.status}): ${errorText}`);
+      return null;
     }
-  } catch (error) {
-    console.error('Error verifying Google ID token:', error.message);
-    return null;
-  }
+    const tokenInfo = await response.json();
+    if (tokenInfo.aud !== EXPECTED_OAUTH_CLIENT_ID) {
+      console.error(`Token verification failed: Invalid audience. Expected ${EXPECTED_OAUTH_CLIENT_ID}, got ${tokenInfo.aud}`);
+       return null;
+     }
+     // Keep issuer check commented out as it caused issues before
+     // if (!tokenInfo.iss || !tokenInfo.iss.includes('accounts.google.com')) {
+     //   console.error('Token verification failed: Invalid issuer.'); return null;
+     // }
+    if (!tokenInfo.exp) { console.error('Token verification failed: No expiration claim.'); return null; }
+    if (tokenInfo.email && tokenInfo.email_verified === 'true') {
+        console.log(`Token verified for email: ${tokenInfo.email}`);
+        return tokenInfo.email;
+    } else { console.error('Token verification failed: Email not verified or missing.'); return null; }
+  } catch (error) { console.error('Error verifying Google OAuth token:', error); return null; }
 }
 
-// --- Authentication Middleware (Now verifies ID Token) ---
+// --- Authentication Middleware (Verifies Access Token) ---
 const authenticateUser = async (req, res, next) => {
     const authHeader = req.headers.authorization;
-    let userEmail = null;
-    let errorMsg = null;
-
+    let userEmail = null; let errorMsg = null;
     if (authHeader && authHeader.startsWith('Bearer ')) {
-        const idToken = authHeader.split(' ')[1]; // Expecting ID Token now
-        userEmail = await verifyGoogleIdToken(idToken);
-        if (!userEmail) {
-            errorMsg = 'Invalid or expired ID token.';
-        }
-    } else {
-        errorMsg = 'Authorization header missing or invalid.';
-    }
-
+        const token = authHeader.split(' ')[1]; // Expecting Access Token
+        console.log("Attempting to verify access token...");
+        userEmail = await verifyGoogleOAuthToken(token); // Use old verification function
+        if (!userEmail) { errorMsg = 'Invalid or expired access token.'; }
+    } else { errorMsg = 'Authorization header missing or invalid.'; }
     if (!userEmail) {
-        console.warn(`Authentication failed: ${errorMsg || 'No valid ID token found.'}`);
-        return res.status(401).json({ error: 'Unauthorized', details: errorMsg || 'Valid ID token required.' });
+        console.warn(`Authentication failed: ${errorMsg || 'No valid token found.'}`);
+        return res.status(401).json({ error: 'Unauthorized', details: errorMsg || 'Valid token required.' });
     }
-
     req.userEmail = userEmail;
     console.log(`Authentication successful for: ${req.userEmail}`);
     next();
@@ -113,28 +98,11 @@ app.use(express.json({ limit: '10mb' }));
 
 // --- API Endpoints ---
 
-// NEW: Endpoint for frontend to verify ID Token after GIS login
-app.post('/api/auth/verify-google', async (req, res) => {
-    const { idToken } = req.body;
-    if (!idToken) {
-        return res.status(400).json({ success: false, error: 'Missing idToken' });
-    }
-    const userEmail = await verifyGoogleIdToken(idToken);
-    if (userEmail) {
-        // Optionally check domain again here if needed
-        // if (!userEmail.endsWith('@ichef.com.tw')) {
-        //     return res.status(403).json({ success: false, error: 'Unauthorized domain' });
-        // }
-        res.json({ success: true, email: userEmail });
-    } else {
-        res.status(401).json({ success: false, error: 'Invalid ID token' });
-    }
-});
+// Removed /api/auth/verify-google endpoint
 
-
-// GET Nearby Places (Requires Authentication via ID Token)
+// GET Nearby Places (Requires Authentication via Access Token)
 app.post('/api/getNearbyPlaces', authenticateUser, async (req, res) => {
-  // ... (logic remains the same, uses req.userEmail set by middleware) ...
+  // ... (logic remains the same) ...
   const { lat, lng } = req.body;
   if (!lat || !lng) { return res.status(400).json({ error: 'Missing latitude or longitude' }); }
   if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.includes('YOUR_')) { console.error("Maps API Key missing."); return res.status(500).json({ error: 'Server config error' }); }
@@ -152,7 +120,7 @@ app.post('/api/getNearbyPlaces', authenticateUser, async (req, res) => {
 
 // POST Check-in (Uses authenticateUser middleware)
 app.post('/api/checkin', authenticateUser, async (req, res) => {
-  // ... (logic remains the same, uses req.userEmail set by middleware) ...
+  // ... (logic remains the same) ...
   const { placeName, placeAddress, placeId } = req.body;
   const userEmail = req.userEmail;
   if (!placeName || !placeAddress || !placeId) { return res.status(400).json({ error: 'Missing placeId, place name or address' }); }
@@ -166,7 +134,7 @@ app.post('/api/checkin', authenticateUser, async (req, res) => {
     else { console.warn(`Could not fetch phone number for ${placeId}. Status: ${detailsData.status}`, detailsData.error_message || ''); }
   } catch (detailsError) { console.error(`Error fetching place details for ${placeId}:`, detailsError); }
   try {
-    const auth = await createServiceAccountAuthClient(); // Use Service Account for Sheets/Drive
+    const auth = await createServiceAccountAuthClient();
     const sheets = google.sheets({ version: 'v4', auth });
     const visitId = Utilities.getUuid(); const now = new Date();
     const values = [[ visitId, userEmail, placeName, fetchedPlacePhone, placeAddress, now.toISOString(), '', '', '', '', '', '', '', placeId ]];
@@ -179,14 +147,14 @@ app.post('/api/checkin', authenticateUser, async (req, res) => {
 
 // POST Check-out (Uses authenticateUser middleware)
 app.post('/api/checkout', authenticateUser, async (req, res) => {
-  // ... (logic remains the same, uses req.userEmail set by middleware) ...
+  // ... (logic remains the same) ...
   const { visitId, contactRole, revisitNeeded, notes, photoBase64, photoMimeType, photoFilename } = req.body;
   const contactPerson = revisitNeeded ? req.body.contactPerson : ''; const contactInfo = revisitNeeded ? req.body.contactInfo : '';
   const userEmail = req.userEmail;
   if (!visitId || !contactRole) { return res.status(400).json({ error: 'Missing visitId or contactRole' }); }
   if (revisitNeeded && (!contactPerson || !contactInfo)) { return res.status(400).json({ error: 'Missing contactPerson or contactInfo when revisit is needed' }); }
   try {
-    const auth = await createServiceAccountAuthClient(); // Use Service Account
+    const auth = await createServiceAccountAuthClient();
     const sheets = google.sheets({ version: 'v4', auth }); const drive = google.drive({ version: 'v3', auth }); const now = new Date();
     console.log(`Finding row for visitId: ${visitId}`);
     const rangeData = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${SHEET_NAME}!A:O` });
