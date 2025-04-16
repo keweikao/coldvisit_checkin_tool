@@ -21,7 +21,7 @@ button { font-size: 1.1em; margin: 0.5em 0; padding: 0.8em 1.2em; cursor: pointe
 button:hover { background-color: #0056b3; }
 input, select, textarea { font-size: 1em; width: calc(100% - 1.2em); margin: 0.5em 0; padding: 0.6em; border: 1px solid #ccc; border-radius: 4px; }
 label { display: block; margin-top: 0.8em; font-weight: bold; color: #555; }
-.hidden { display: none; }
+.hidden { display: none !important; } /* Added !important to increase specificity */
 #selected-place { background-color: #e9ecef; padding: 0.8em; border-radius: 5px; margin-bottom: 1em; }
 #photo-preview { max-width: 100%; max-height: 150px; /* Limit preview height */ object-fit: cover; margin-top: 0.5em; border-radius: 5px; border: 1px solid #ddd; }
 #loading-map { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.8); padding: 1em; border-radius: 5px; z-index: 20; }
@@ -31,8 +31,11 @@ label { display: block; margin-top: 0.8em; font-weight: bold; color: #555; }
 .infowindow-content strong { display: block; margin-bottom: 5px; }
 .infowindow-content span { display: block; font-size: 0.9em; color: #555; margin-bottom: 8px; }
 .infowindow-content button { font-size: 0.9em; padding: 5px 10px; margin-top: 5px; }
-/* Center Login Button */
-#login-section { display: flex; justify-content: center; align-items: center; min-height: 100px; /* Adjust as needed */ }
+/* Center Login Button Container */
+#login-section > div { display: flex; justify-content: center; align-items: center; min-height: 50px; /* Adjust as needed */ }
+/* Removed display:flex from #login-section itself */
+#login-section { min-height: 100px; /* Adjust as needed */ }
+
 </style>
 </head>
 <body>
@@ -47,7 +50,7 @@ label { display: block; margin-top: 0.8em; font-weight: bold; color: #555; }
     <!-- Login Area -->
     <div id="login-section">
         <h1>地面推廣拜訪紀錄</h1> <!-- Moved Title here -->
-        <div style="display: flex; justify-content: center; align-items: center; min-height: 50px;"> <!-- Centering container -->
+        <div> <!-- Centering container -->
              <button id="login-btn">使用 @ichef.com.tw 登入</button>
         </div>
     </div>
