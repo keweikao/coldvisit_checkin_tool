@@ -98,7 +98,13 @@ app.use(express.json({ limit: '10mb' }));
 
 // --- API Endpoints ---
 
-// Removed /api/auth/verify-google endpoint
+// NEW: Endpoint to get user email from verified token
+app.get('/api/user/me', authenticateUser, (req, res) => {
+    // The authenticateUser middleware already verified the token
+    // and attached the email to req.userEmail
+    res.json({ email: req.userEmail });
+});
+
 
 // GET Nearby Places (Requires Authentication via Access Token)
 app.post('/api/getNearbyPlaces', authenticateUser, async (req, res) => {

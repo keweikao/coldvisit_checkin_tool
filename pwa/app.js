@@ -47,7 +47,6 @@ const revisitNeededSelect = document.getElementById('revisit-needed');
    console.log("onload - userEmail:", userEmail);
    console.log("onload - visitId:", visitId);
 
-   // --- MODIFIED LOGIC ---
    // Only check for accessToken to determine if logged in initially
    if (accessToken) {
      console.log("onload - Access token found. Initializing app.");
@@ -56,7 +55,6 @@ const revisitNeededSelect = document.getElementById('revisit-needed');
      console.log("onload - No access token, showing login.");
      showLoginSection();
    }
-   // --- END MODIFIED LOGIC ---
  };
 
  // initMap is called by the Google Maps script callback
@@ -165,5 +163,4 @@ function handleBackToMap() { /* ... keep existing ... */ if (confirm("確定要�
 
 // Make map init globally accessible for API callback
 window.initMap = initMap;
-// Make select place globally accessible for button onclick in InfoWindow
-window.handleSelectPlaceFromMap = handleSelectPlaceFromMap; // Keep this if using inline onclick was intended, otherwise remove if addEventListener is used
+// Removed global assignment for handleSelectPlaceFromMap as addEventListener is used
