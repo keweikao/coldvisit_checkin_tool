@@ -35,6 +35,8 @@ label { display: block; margin-top: 0.8em; font-weight: bold; color: #555; }
 #login-section > div { display: flex; justify-content: center; align-items: center; min-height: 50px; /* Adjust as needed */ }
 /* Removed display:flex from #login-section itself */
 #login-section { min-height: 100px; /* Adjust as needed */ }
+/* Styling for conditional input groups */
+.conditional-input-group { border-left: 3px solid #007bff; padding-left: 10px; margin-left: 5px; margin-top: 0.5em; margin-bottom: 1em; }
 
 </style>
 </head>
@@ -77,13 +79,56 @@ label { display: block; margin-top: 0.8em; font-weight: bold; color: #555; }
          <option value="其他">其他</option>
      </select>
 
+     <!-- Brand Status -->
+     <label for="brand-status">品牌狀況：</label>
+     <select id="brand-status" required>
+         <option value="" disabled selected>請選擇...</option>
+         <option value="單店">單店</option>
+         <option value="10間以下">10間以下</option>
+         <option value="10間以上">10間以上</option>
+     </select>
+
+     <!-- POS -->
+     <label for="using-pos">是否使用 POS：</label>
+     <select id="using-pos">
+         <option value="否" selected>否</option>
+         <option value="是">是</option>
+     </select>
+     <div id="pos-brand-section" class="hidden conditional-input-group">
+         <label for="pos-brand">POS 品牌：</label>
+         <input id="pos-brand" type="text" />
+     </div>
+
+     <!-- Online Ordering -->
+     <label for="using-online-ordering">是否使用線上點餐：</label>
+     <select id="using-online-ordering">
+         <option value="否" selected>否</option>
+         <option value="是">是</option>
+     </select>
+     <div id="ordering-brand-section" class="hidden conditional-input-group">
+         <label for="ordering-brand">線上點餐品牌：</label>
+         <input id="ordering-brand" type="text" />
+     </div>
+
+     <!-- Online Booking -->
+     <label for="using-online-booking">是否使用線上訂位：</label>
+     <select id="using-online-booking">
+         <option value="否" selected>否</option>
+         <option value="是">是</option>
+     </select>
+     <div id="booking-brand-section" class="hidden conditional-input-group">
+         <label for="booking-brand">線上訂位品牌：</label>
+         <input id="booking-brand" type="text" />
+     </div>
+
+
      <label for="revisit-needed">是否安排再訪：</label>
      <select id="revisit-needed">
        <option value="否" selected>否</option>
        <option value="是">是</option>
      </select>
 
-     <div id="contact-details" class="hidden">
+     <div id="contact-details" class="hidden conditional-input-group"> <!-- Added class -->
          <label for="contact-person">聯絡人姓名：</label>
          <input id="contact-person" />
          <label for="contact-info">聯絡電話：</label>
