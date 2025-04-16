@@ -37,14 +37,22 @@ label { display: block; margin-top: 0.8em; font-weight: bold; color: #555; }
 </head>
 <body>
 
-<div id="controls">
-   <h1>地面推廣拜訪紀錄</h1> <!-- Changed Title -->
+ <div id="controls">
+    <!-- User Status / Logout Area -->
+    <div id="user-status" class="hidden" style="padding-bottom: 1em; margin-bottom: 1em; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
+        <span id="user-email" style="font-size: 0.9em; color: #333;"></span>
+        <button id="logout-btn" style="font-size: 0.9em; padding: 0.4em 0.8em; background-color: #dc3545;">登出</button>
+    </div>
 
-   <div id="login-section">
-     <button id="login-btn">使用 @ichef.com.tw 登入</button> <!-- Reverted to original button -->
-   </div>
+    <!-- Login Area -->
+    <div id="login-section">
+        <h1>地面推廣拜訪紀錄</h1> <!-- Moved Title here -->
+        <div style="display: flex; justify-content: center; align-items: center; min-height: 50px;"> <!-- Centering container -->
+             <button id="login-btn">使用 @ichef.com.tw 登入</button>
+        </div>
+    </div>
 
-   <div id="checkin-section" class="hidden">
+    <div id="checkin-section" class="hidden">
     <h2>1. 在地圖上選擇拜訪店家</h2>
     <p id="checkin-instructions">請點擊地圖上的標記選擇店家，或在地圖空白處點擊以手動新增。</p>
     <!-- Map is displayed below -->
