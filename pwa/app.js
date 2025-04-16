@@ -6,7 +6,7 @@ const COMPANY_DOMAIN = 'ichef.com.tw';
 
 // --- 全域變數 ---
 let accessToken = localStorage.getItem('access_token'); // Use accessToken again
-let userEmail = localStorage.getItem('userEmail'); // Store user email after verification
+let userEmail = localStorage.getItem('userEmail'); // Still store/retrieve email, but don't block on it initially
 let visitId = localStorage.getItem('visitId');
 let placeName = localStorage.getItem('placeName');
 let placeAddress = localStorage.getItem('placeAddress');
@@ -22,8 +22,8 @@ let markers = [];
 
 // --- DOM 元素 ---
 const loginSection = document.getElementById('login-section');
-const userStatusDiv = document.getElementById('user-status'); // New
-const userEmailSpan = document.getElementById('user-email'); // New
+const userStatusDiv = document.getElementById('user-status');
+const userEmailSpan = document.getElementById('user-email');
 const checkinSection = document.getElementById('checkin-section');
 const checkoutSection = document.getElementById('checkout-section');
 const loadingMapDiv = document.getElementById('loading-map');
@@ -38,8 +38,8 @@ const revisitNeededSelect = document.getElementById('revisit-needed');
    console.log("window.onload triggered");
    handleRedirectHash(); // Check for OAuth token in hash first
 
-   accessToken = localStorage.getItem('access_token');
-   userEmail = localStorage.getItem('userEmail'); // Retrieve stored email
+   accessToken = localStorage.getItem('access_token'); // Read token
+   userEmail = localStorage.getItem('userEmail'); // Try to read stored email
    visitId = localStorage.getItem('visitId');
    placeName = localStorage.getItem('placeName');
    placeAddress = localStorage.getItem('placeAddress');
@@ -47,31 +47,70 @@ const revisitNeededSelect = document.getElementById('revisit-needed');
    console.log("onload - userEmail:", userEmail);
    console.log("onload - visitId:", visitId);
 
-   if (accessToken && userEmail) { // Check for both token and email
-     console.log("onload - User is authenticated.");
-     initializeApp();
+   // --- MODIFIED LOGIC ---
+   // Only check for accessToken to determine if logged in initially
+   if (accessToken) {
+     console.log("onload - Access token found. Initializing app.");
+     initializeApp(); // Initialize app, which will fetch email if needed
    } else {
-     console.log("onload - Not authenticated, showing login.");
-     // Clear potentially inconsistent state if token exists but email doesn't
-     if (accessToken && !userEmail) localStorage.removeItem('access_token');
+     console.log("onload - No access token, showing login.");
      showLoginSection();
    }
+   // --- END MODIFIED LOGIC ---
  };
 
  // initMap is called by the Google Maps script callback
 
  // --- Event Listeners ---
  document.getElementById('login-btn').onclick = handleLogin;
- document.getElementById('logout-btn').onclick = handleLogout; // Added logout listener
+ document.getElementById('logout-btn').onclick = handleLogout;
  document.getElementById('photo-input').onchange = handlePhotoChange;
  document.getElementById('submit-checkout').onclick = handleSubmitCheckout;
  document.getElementById('back-to-map').onclick = handleBackToMap;
  document.getElementById('revisit-needed').onchange = toggleContactDetails;
 
  // --- App Initialization for Authenticated User ---
- function initializeApp() {
+ async function initializeApp() { // Make async to fetch email
     console.log("initializeApp called");
-    showUserStatus(); // Show user email and logout button
+    loginSection.classList.add('hidden'); // Hide login button area
+
+    // Fetch user email if not already available
+    if (!userEmail && accessToken) {
+        console.log("initializeApp - Fetching user email from backend...");
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/user/me`, {
+                headers: { 'Authorization': 'Bearer ' + accessToken },
+                mode: 'cors'
+            });
+            if (!response.ok) {
+                // If fetching email fails (e.g., token expired), force logout
+                throw new Error(`Failed to fetch email (${response.status})`);
+            }
+            const data = await response.json();
+            if (data.email) {
+                userEmail = data.email;
+                localStorage.setItem('userEmail', userEmail); // Store fetched email
+                console.log("initializeApp - User email fetched:", userEmail);
+                showUserStatus(); // Update UI with email
+            } else {
+                 throw new Error('Backend did not return email');
+            }
+        } catch (error) {
+            console.error("initializeApp - Failed to fetch user email:", error);
+            alert("無法驗證您的登入狀態，請重新登入。");
+            handleLogout(); // Force logout if email fetch fails
+            return; // Stop initialization
+        }
+    } else if (userEmail) {
+        // If email already exists (from localStorage), show it
+        showUserStatus();
+    } else {
+        // Should not happen if accessToken exists, but handle defensively
+        handleLogout();
+        return;
+    }
+
+    // Proceed with showing checkin/checkout based on visitId
     visitId = localStorage.getItem('visitId');
     placeName = localStorage.getItem('placeName');
     placeAddress = localStorage.getItem('placeAddress');
@@ -93,19 +132,7 @@ const revisitNeededSelect = document.getElementById('revisit-needed');
  }
 
 // --- Map Initialization (Called by Google Maps API) ---
-function initMap() {
-  console.log("Maps API loaded, calling initMap...");
-  accessToken = localStorage.getItem('access_token'); // Re-check token
-  if (accessToken && !checkinSection.classList.contains('hidden')) {
-      getCurrentLocationAndLoadMap();
-  } else {
-      console.log("initMap - Skipping map load (not authenticated or not on checkin screen).");
-      loadingMapDiv.classList.add('hidden');
-      if (!accessToken) { showLoginSection(); }
-  }
-}
-
-// --- Other functions (Keep map, UI, photo, checkout logic as is) ---
+function initMap() { /* ... keep implementation ... */ console.log("Maps API loaded, calling initMap..."); accessToken = localStorage.getItem('access_token'); if (accessToken && !checkinSection.classList.contains('hidden')) { getCurrentLocationAndLoadMap(); } else { console.log("initMap - Skipping map load (not authenticated or not on checkin screen)."); loadingMapDiv.classList.add('hidden'); if (!accessToken) { showLoginSection(); } } }
 function getCurrentLocationAndLoadMap() { /* ... keep implementation ... */ loadingMapDiv.innerText = '取得目前位置...'; loadingMapDiv.classList.remove('hidden'); mapDiv.style.display = 'block'; if (navigator.geolocation) { navigator.geolocation.getCurrentPosition( (position) => { const userLocation = { lat: position.coords.latitude, lng: position.coords.longitude }; console.log("User location:", userLocation); loadingMapDiv.innerText = '載入地圖與附近店家...'; if (!map) { createMap(userLocation); } else { map.setCenter(userLocation); } searchNearbyPlaces(userLocation); }, (error) => { console.error("Geolocation error:", error); loadingMapDiv.innerText = '無法取得位置，請允許權限。'; alert(`無法取得位置: ${error.message}`); }, { enableHighAccuracy: true } ); } else { loadingMapDiv.innerText = '瀏覽器不支援定位功能。'; alert('瀏覽器不支援定位功能。'); } }
 function createMap(location) { /* ... keep implementation ... */ console.log("Creating map centered at:", location); map = new google.maps.Map(mapDiv, { center: location, zoom: 17, mapTypeControl: false, streetViewControl: false }); new google.maps.Marker({ position: location, map: map, title: "我的位置", icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#4285F4", fillOpacity: 1, strokeWeight: 2, strokeColor: "#ffffff" } }); infoWindow = new google.maps.InfoWindow(); if (google.maps.places && google.maps.places.PlacesService) { console.log("Creating PlacesService."); placesService = new google.maps.places.PlacesService(map); } else { console.error("Places library not loaded!"); alert("地圖地點服務載入失敗。"); loadingMapDiv.innerText = '地圖地點服務載入失敗。'; } }
 function searchNearbyPlaces(location) { /* ... keep implementation ... */ const request = { location: location, radius: '50' }; console.log("Attempting nearbySearch with request:", request); if (!placesService) { console.error("placesService not initialized!"); alert("地點搜尋服務未就緒。"); return; } placesService.nearbySearch(request, (results, status) => { console.log("nearbySearch callback status:", status); loadingMapDiv.classList.add('hidden'); clearMarkers(); if (status === google.maps.places.PlacesServiceStatus.OK && results) { console.log(`Found ${results.length} places nearby.`); if (results.length === 0) { alert("附近 50 公尺內找不到地點標記。"); } results.forEach(place => createMarker(place)); } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) { console.log("No places found nearby."); alert("附近 50 公尺內找不到地點標記。"); } else { console.error("Places API search failed:", status); alert("搜尋附近地點時發生錯誤: " + status); } }); }
@@ -114,78 +141,23 @@ function clearMarkers() { /* ... keep existing ... */ markers.forEach(marker => 
 function escapeJS(str) { /* ... keep existing ... */ return str ? str.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n') : ''; }
 
 // --- UI Section Toggling ---
-function showLoginSection() {
-  loginSection.classList.remove('hidden');
-  userStatusDiv.classList.add('hidden'); // Hide user status
-  checkinSection.classList.add('hidden');
-  checkoutSection.classList.add('hidden');
-  mapDiv.style.display = 'none';
-  loadingMapDiv.classList.add('hidden');
-}
-function showUserStatus() {
-    // Shows the user status div and hides login
-    if (userEmail) {
-        userEmailSpan.textContent = `登入身分： ${userEmail}`;
-        userStatusDiv.classList.remove('hidden');
-        loginSection.classList.add('hidden');
-    } else {
-        // If somehow email is missing, force login view
-        showLoginSection();
-    }
-}
-function showCheckInSection() {
-  showUserStatus(); // Show user status instead of login button
-  checkinSection.classList.remove('hidden');
-  checkoutSection.classList.add('hidden');
-  mapDiv.style.display = 'block';
-  loadingMapDiv.classList.remove('hidden');
-  clearVisitData();
-   if (typeof google === 'object' && typeof google.maps === 'object' && !map) {
-        getCurrentLocationAndLoadMap();
-   } else if (map) {
-       loadingMapDiv.classList.add('hidden');
-   }
-}
-function showCheckoutSection() {
-  showUserStatus(); // Show user status instead of login button
-  checkinSection.classList.add('hidden');
-  checkoutSection.classList.remove('hidden');
-  mapDiv.style.display = 'none';
-  loadingMapDiv.classList.add('hidden');
-  selectedPlaceDiv.innerHTML = `<strong>${placeName}</strong><br/><span>地址：${placeAddress || 'N/A'}</span>`;
-  document.getElementById('photo-input').value = ''; photoPreview.style.display = 'none'; photoPreview.src = ''; document.getElementById('contact-role').value = ''; revisitNeededSelect.value = '否'; document.getElementById('contact-person').value = ''; document.getElementById('contact-info').value = ''; document.getElementById('notes').value = '';
-  toggleContactDetails();
-}
+function showLoginSection() { /* ... keep existing ... */ loginSection.classList.remove('hidden'); userStatusDiv.classList.add('hidden'); checkinSection.classList.add('hidden'); checkoutSection.classList.add('hidden'); mapDiv.style.display = 'none'; loadingMapDiv.classList.add('hidden'); }
+function showUserStatus() { /* ... keep existing ... */ if (userEmail) { userEmailSpan.textContent = `登入身分： ${userEmail}`; userStatusDiv.classList.remove('hidden'); loginSection.classList.add('hidden'); } else { showLoginSection(); } }
+function showCheckInSection() { /* ... keep existing ... */ showUserStatus(); checkinSection.classList.remove('hidden'); checkoutSection.classList.add('hidden'); mapDiv.style.display = 'block'; loadingMapDiv.classList.remove('hidden'); clearVisitData(); if (typeof google === 'object' && typeof google.maps === 'object' && !map) { getCurrentLocationAndLoadMap(); } else if (map) { loadingMapDiv.classList.add('hidden'); } }
+function showCheckoutSection() { /* ... keep existing ... */ showUserStatus(); checkinSection.classList.add('hidden'); checkoutSection.classList.remove('hidden'); mapDiv.style.display = 'none'; loadingMapDiv.classList.add('hidden'); selectedPlaceDiv.innerHTML = `<strong>${placeName}</strong><br/><span>地址：${placeAddress || 'N/A'}</span>`; document.getElementById('photo-input').value = ''; photoPreview.style.display = 'none'; photoPreview.src = ''; document.getElementById('contact-role').value = ''; revisitNeededSelect.value = '否'; document.getElementById('contact-person').value = ''; document.getElementById('contact-info').value = ''; document.getElementById('notes').value = ''; toggleContactDetails(); }
 
 // --- Data Handling ---
 function clearVisitData() { /* ... keep existing ... */ visitId = null; placeName = null; placeAddress = null; photoBase64 = ''; photoMimeType = ''; photoFilename = ''; localStorage.removeItem('visitId'); localStorage.removeItem('placeName'); localStorage.removeItem('placeAddress'); }
 
-// --- Auth ---
+// --- Auth (Reverted to Implicit Flow) ---
 function handleLogin() { /* ... keep existing redirect logic ... */ const redirectUri = window.location.origin + window.location.pathname; const scope = 'openid email profile'; const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&hd=${COMPANY_DOMAIN}&prompt=select_account`; window.location.href = authUrl; }
-function handleRedirectHash() { /* ... keep existing logic ... */ const hash = window.location.hash.substring(1); if (hash) { const params = new URLSearchParams(hash); const token = params.get('access_token'); const error = params.get('error'); window.location.hash = ''; if (token) { accessToken = token; localStorage.setItem('access_token', accessToken); /* Don't reload, let onload handle */ } else if (error) { console.error('OAuth Error:', error); alert('登入失敗: ' + error); localStorage.removeItem('access_token'); } } }
-function handleLogout() {
-    console.log("Logging out...");
-    // Clear all relevant variables and storage
-    accessToken = null;
-    userEmail = null;
-    idToken = null; // Clear this if it was used by GIS previously
-    isAuthenticated = false;
-    clearVisitData(); // Clear ongoing visit
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('userEmail');
-    localStorage.removeItem('isAuthenticated');
-    // Show the login screen
-    showLoginSection();
-}
+function handleRedirectHash() { /* ... keep existing logic ... */ const hash = window.location.hash.substring(1); if (hash) { const params = new URLSearchParams(hash); const token = params.get('access_token'); const error = params.get('error'); window.location.hash = ''; if (token) { accessToken = token; localStorage.setItem('access_token', accessToken); /* Don't reload */ } else if (error) { console.error('OAuth Error:', error); alert('登入失敗: ' + error); localStorage.removeItem('access_token'); } } }
+function handleLogout() { /* ... keep existing ... */ console.log("Logging out..."); accessToken = null; userEmail = null; clearVisitData(); localStorage.removeItem('access_token'); localStorage.removeItem('userEmail'); showLoginSection(); }
 
-
-// --- API Calls ---
-// Check-in Call (Uses Access Token)
+// --- API Calls (Uses Access Token) ---
 async function handleSelectPlaceFromMap(pId, pName, pAddress) { /* ... keep existing ... */ if (!accessToken) { alert('請先登入'); handleLogin(); return; } if (infoWindow) infoWindow.close(); const controlsLoading = document.createElement('div'); controlsLoading.innerText = '記錄進店資訊...'; checkinSection.appendChild(controlsLoading); try { const response = await fetch(`${API_BASE_URL}/api/checkin`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken }, mode: 'cors', body: JSON.stringify({ placeId: pId, placeName: pName, placeAddress: pAddress, placePhone: '' }) }); const result = await response.json(); checkinSection.removeChild(controlsLoading); if (response.ok && result.success && result.visitId) { visitId = result.visitId; placeName = pName; placeAddress = pAddress; localStorage.setItem('visitId', visitId); localStorage.setItem('placeName', placeName); localStorage.setItem('placeAddress', placeAddress); showCheckoutSection(); } else { throw new Error(result.error || `Check-in API failed (${response.status})`); } } catch (error) { console.error('Check-in failed:', error); checkinSection.removeChild(controlsLoading); alert('記錄進店資訊失敗: ' + error.message); } }
-// Photo Handling
 function handlePhotoChange(e) { /* ... keep existing ... */ const file = e.target.files[0]; if (!file) { photoBase64 = ''; photoPreview.style.display = 'none'; return; } photoMimeType = file.type; photoFilename = file.name; const reader = new FileReader(); reader.onload = () => { photoBase64 = reader.result; photoPreview.src = photoBase64; photoPreview.style.display = 'block'; }; reader.onerror = () => { alert('讀取照片失敗'); photoPreview.style.display = 'none'; photoBase64 = ''; }; reader.readAsDataURL(file); }
- // Check-out Call (Uses Access Token)
- async function handleSubmitCheckout() { /* ... keep existing logic, ensure it uses accessToken ... */ const contactRole = document.getElementById('contact-role').value; const revisitNeeded = revisitNeededSelect.value === '是'; const contactPersonInput = document.getElementById('contact-person'); const contactInfoInput = document.getElementById('contact-info'); const notes = document.getElementById('notes').value; let contactPerson = ''; let contactInfo = ''; if (!accessToken) { alert('請先登入'); handleLogin(); return; } if (!contactRole) { alert('請選擇接觸人員角色'); return; } if (!visitId) { alert('發生錯誤，找不到拜訪 ID'); clearVisitData(); showCheckInSection(); return; } if (revisitNeeded) { contactPerson = contactPersonInput.value.trim(); contactInfo = contactInfoInput.value.trim(); if (!contactPerson || !contactInfo) { alert('預計再訪時，請填寫聯絡人姓名與聯絡電話'); return; } } const controlsLoading = document.createElement('div'); controlsLoading.innerText = '送出拜訪紀錄...'; checkoutSection.appendChild(controlsLoading); try { const response = await fetch(`${API_BASE_URL}/api/checkout`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken }, mode: 'cors', body: JSON.stringify({ visitId: visitId, contactRole: contactRole, revisitNeeded: revisitNeeded, contactPerson: contactPerson, contactInfo: contactInfo, notes: notes, photoBase64: photoBase64, photoMimeType: photoMimeType, photoFilename: photoFilename }) }); const result = await response.json(); checkoutSection.removeChild(controlsLoading); if (response.ok && result.success) { alert('紀錄已成功送出！'); clearVisitData(); showCheckInSection(); getCurrentLocationAndLoadMap(); } else { throw new Error(result.error || `Check-out API failed (${response.status})`); } } catch (error) { console.error('Check-out failed:', error); checkoutSection.removeChild(controlsLoading); alert('送出紀錄失敗: ' + error.message); } }
+ async function handleSubmitCheckout() { /* ... keep existing logic ... */ const contactRole = document.getElementById('contact-role').value; const revisitNeeded = revisitNeededSelect.value === '是'; const contactPersonInput = document.getElementById('contact-person'); const contactInfoInput = document.getElementById('contact-info'); const notes = document.getElementById('notes').value; let contactPerson = ''; let contactInfo = ''; if (!accessToken) { alert('請先登入'); handleLogin(); return; } if (!contactRole) { alert('請選擇接觸人員角色'); return; } if (!visitId) { alert('發生錯誤，找不到拜訪 ID'); clearVisitData(); showCheckInSection(); return; } if (revisitNeeded) { contactPerson = contactPersonInput.value.trim(); contactInfo = contactInfoInput.value.trim(); if (!contactPerson || !contactInfo) { alert('預計再訪時，請填寫聯絡人姓名與聯絡電話'); return; } } const controlsLoading = document.createElement('div'); controlsLoading.innerText = '送出拜訪紀錄...'; checkoutSection.appendChild(controlsLoading); try { const response = await fetch(`${API_BASE_URL}/api/checkout`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken }, mode: 'cors', body: JSON.stringify({ visitId: visitId, contactRole: contactRole, revisitNeeded: revisitNeeded, contactPerson: contactPerson, contactInfo: contactInfo, notes: notes, photoBase64: photoBase64, photoMimeType: photoMimeType, photoFilename: photoFilename }) }); const result = await response.json(); checkoutSection.removeChild(controlsLoading); if (response.ok && result.success) { alert('紀錄已成功送出！'); clearVisitData(); showCheckInSection(); getCurrentLocationAndLoadMap(); } else { throw new Error(result.error || `Check-out API failed (${response.status})`); } } catch (error) { console.error('Check-out failed:', error); checkoutSection.removeChild(controlsLoading); alert('送出紀錄失敗: ' + error.message); } }
 
 // --- UI Logic Functions ---
 function toggleContactDetails() { /* ... keep existing ... */ if (revisitNeededSelect.value === '是') { contactDetailsDiv.classList.remove('hidden'); } else { contactDetailsDiv.classList.add('hidden'); } }
@@ -193,5 +165,5 @@ function handleBackToMap() { /* ... keep existing ... */ if (confirm("確定要�
 
 // Make map init globally accessible for API callback
 window.initMap = initMap;
-// Make select place globally accessible for inline button onclick in InfoWindow
-window.handleSelectPlaceFromMap = handleSelectPlaceFromMap;
+// Make select place globally accessible for button onclick in InfoWindow
+window.handleSelectPlaceFromMap = handleSelectPlaceFromMap; // Keep this if using inline onclick was intended, otherwise remove if addEventListener is used
